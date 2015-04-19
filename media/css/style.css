@@ -1,0 +1,84 @@
+/* Overall page styling */
+body {
+    text-align: center;
+    font-family: Verdana,Arial,Helvetica,sans-serif;
+    font-size: 14px;
+    margin: 0;
+    padding: 0;
+}
+
+#container {
+    width: 960px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+/* Header styling */
+#header {
+    border-bottom: 2px solid gray;
+}
+
+#header_inner {
+    margin: 4px;
+}
+
+#header h1 {
+    color: gray;
+    line-height: 1em;
+    margin: 0;
+    font-variant: small-caps;
+    font-size: 18px;
+}
+
+/* Main area styling */
+#main {
+}
+
+#main_inner {
+    padding: 4px;
+}
+
+/* Footer styling */
+#footer {
+    font-size: 11px;
+    border-top: 2px solid gray;
+    color: gray;
+}
+
+#footer_inner {
+    padding: 4px;
+}
+
+#footer a {
+    color: gray;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+#footer p {
+    margin: 0;
+}
+
+/* Content styling */
+table {
+    border-collapse: collapse;
+}
+
+h1 {
+    font-size: 18px;
+}
+
+h2 {
+    font-size: 14px;
+}
+
+.box {
+    border: 1px solid #ccc;
+    background-color: #eee;
+    padding: 4px;
+}
+
+textarea {
+    font-family: Verdana,Arial,Helvetica,sans-serif;
+    font-size: 14px;
+}
