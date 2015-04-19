@@ -1,151 +1,125 @@
 <!DOCTYPE HTML>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Cryptiki.com - Password generator</title>
-  <link rel="stylesheet" href="/media/css/style.css" type="text/css">
-  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
-  <script type="text/javascript" src="/media/js/sha256.js"></script>
-  <style type="text/css">
-    #source {
-      width: 100%;
-      height: 200px;
-      border: 1px solid black;
-      text-align: center;
-    }
-  </style>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Cryptiki.com - Client-side encryption for your content">
+<meta name="author" content="Joonas Pihlajamaa">
+<link rel="icon" href="/media/icon/favicon.ico">
+<title>Cryptiki.com - Password generator</title>
 </head>
 <body>
 
-<div id="container">
+<h1>Cryptiki.com - Password generator</h1>
 
-<div id="header">
-  <div id="header_inner">
-    <h1>Cryptiki.com - Password generator</h1>
-  </div>
+<p>The password generator uses entropy in mouse movement and SHA-256 to
+create truly random passwords.</p>
+
+<p>Hash window size: <input id="winsize" value="2000" size="5">
+<button class="wsb">100</button> <button class="wsb">1000</button>
+<button class="wsb">2000</button> <button class="wsb">5000</button></p>
+
+<p>Special characters: <input id="specialchars" size="25"
+value="!@#$%^&amp;*()_+=-[]{};'&quot;&gt;&lt;,.?/\">
+<button class="ssb">Toggle</button>
+</p>
+
+<div id="source" style="width: 100%; height: 200px; text-align: center; border: 1px solid black">
+  <p>Move your mouse around in the box to generate randomness.</p>
+  <p>(or tap with a mobile device, it just takes longer)</p>
+  <p id="message"></p>
 </div>
 
-<div id="main">
-  <div id="main_inner">
+<h2>Random password: </h2>
+<p><input id="password" size="50"> <button class="psb">10</button>
+<button class="psb">15</button> <button class="psb">20</button></p>
 
-    <p>The password generator uses entropy in mouse movement and SHA-256 to
-    create truly random passwords.</p>
+<script type="text/javascript" src="/media/js/sha256.js"></script>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+<script type="text/javascript">
+var randomness = '', alphanum =
+'0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-    <p>Hash window size: <input id="winsize" value="2000" size="5">
-    <button class="wsb">100</button> <button class="wsb">1000</button>
-    <button class="wsb">2000</button> <button class="wsb">5000</button></p>
+// Transform hex into byte array
+function hex2bytes(hex) {
+  var bs = [], i;
 
-    <p>Special characters: <input id="specialchars" size="25"
-    value="!@#$%^&amp;*()_+=-[]{};'&quot;&gt;&lt;,.?/\">
-    <button class="ssb">Toggle</button>
-    </p>
+  if(hex.length & 1) // first nibble out
+    bs.push(parseInt(hex.charAt(0), 16));
 
-    <div id="source" style="">
-      <p>Move your mouse around in the box to generate randomness.</p>
-      <p>(or tap with a mobile device, it just takes longer)</p>
-      <p id="message"></p>
-    </div>
+  for(i = bs.length; i < hex.length; i+=2) // then 2 nibbles a time
+    bs.push(parseInt(hex.substr(i, 2), 16));
 
-    <h2>Random password: </h2>
-    <p><input id="password" size="50"> <button class="psb">10</button>
-    <button class="psb">15</button> <button class="psb">20</button></p>
+  return bs;
+}
 
-    <script type="text/javascript">
-      var randomness = '', alphanum =
-        '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+function sumBytes(bs) {
+  var sum = 0, i;
 
-      // Transform hex into byte array
-      function hex2bytes(hex) {
-        var bs = [], i;
+  for(i = 0; i < bs.length; i++)
+    sum += bs[i];
 
-        if(hex.length & 1) // first nibble out
-          bs.push(parseInt(hex.charAt(0), 16));
+  return sum;
+}
 
-        for(i = bs.length; i < hex.length; i+=2) // then 2 nibbles a time
-          bs.push(parseInt(hex.substr(i, 2), 16));
+// Adapted from Leemon's BigInt.js
+function divBytes(bs, n) {
+  var i, r = 0, s;
 
-        return bs;
-      }
+  for(i = 0; i < bs.length; i++) {
+    s = r * 256 + bs[i];
+    bs[i] = Math.floor(s / n);
+    r = s % n;
+  }
 
-      function sumBytes(bs) {
-        var sum = 0, i;
+  return r;
+}
 
-        for(i = 0; i < bs.length; i++)
-          sum += bs[i];
+// Uses BigInt.js to get maximum characters out of 256-bit SHA256
+function generatePass(hex, chars) {
+  var pass = '', bytes = hex2bytes(hex, 16, 512, 0), i, mod;
 
-        return sum;
-      }
+  while(true) {
+    mod = divBytes(bytes, chars.length);
+    if(sumBytes(bytes) == 0) break; // bits consumed
+    pass += chars.charAt(mod);
+  }
 
-      // Adapted from Leemon's BigInt.js
-      function divBytes(bs, n) {
-        var i, r = 0, s;
+  return pass;
+}
 
-        for(i = 0; i < bs.length; i++) {
-          s = r * 256 + bs[i];
-          bs[i] = Math.floor(s / n);
-          r = s % n;
-        }
+$(document).ready(function() {
+    var randStr = '', specialToggle = '';
 
-        return r;
-      }
+    $('.wsb').click(function(ev) { $('#winsize').val($(this).html()); });
 
-      // Uses BigInt.js to get maximum characters out of 256-bit SHA256
-      function generatePass(hex, chars) {
-        var pass = '', bytes = hex2bytes(hex, 16, 512, 0), i, mod;
-
-        while(true) {
-          mod = divBytes(bytes, chars.length);
-          if(sumBytes(bytes) == 0) break; // bits consumed
-          pass += chars.charAt(mod);
-        }
-
-        return pass;
-      }
-
-      $(document).ready(function() {
-        var randStr = '', specialToggle = '';
-
-        $('.wsb').click(function(ev) { $('#winsize').val($(this).html()); });
-
-        $('.ssb').click(function(ev) {
-          var prev = $('#specialchars').val();
-          $('#specialchars').val(specialToggle);
-          specialToggle = prev;
-        });
-
-        $('.psb').click(function(ev) {
-          var prev = $('#password').val();
-          $('#password').val(prev.substr(0, parseInt($(this).html())));
-        });
-
-        $('#source').mousemove(function(ev) {
-          var winsize = parseInt($('#winsize').val()), pass;
-
-          randStr += ev.pageX + ',' + ev.pageY;
-
-          if(randStr.length >= winsize) {
-            $('#password').val(generatePass(hex_sha256(randStr),
-              alphanum + $('#specialchars').val()));
-            randStr = '';
-          }
-
-          $('#message').html(randStr.length + ' / ' + winsize);
-        });
+    $('.ssb').click(function(ev) {
+      var prev = $('#specialchars').val();
+      $('#specialchars').val(specialToggle);
+      specialToggle = prev;
       });
-    </script>
-  </div> <!-- main_inner -->
-</div> <!-- main -->
 
-<div id="footer">
-  <div id="footer_inner">
-    <p>Copyright &copy; <a href="http://joonaspihlajamaa.com">Joonas Pihlajamaa</a> 2009. All rights reserved.
-    <strong style="font-variant: small-caps;">No warranties of any kind, use purely on your own risk.</strong></p>
-    <p><a href="http://en.wikipedia.org/wiki/Advanced_Encryption_Standard">AES</a> cipher routines by <a href="http://www.movable-type.co.uk/scripts/aes.html">Chris Veness</a>.
-    <a href="http://www.leemon.com/crypto/BigInt.html">BigInt</a> routines <a href="http://www.leemon.com/">Leemon Baird</a>.</p>
-  </div> <!-- footer_inner -->
-</div> <!-- footer -->
+    $('.psb').click(function(ev) {
+      var prev = $('#password').val();
+      $('#password').val(prev.substr(0, parseInt($(this).html())));
+      });
 
-</div> <!-- container -->
+    $('#source').mousemove(function(ev) {
+      var winsize = parseInt($('#winsize').val()), pass;
+
+      randStr += ev.pageX + ',' + ev.pageY;
+
+      if(randStr.length >= winsize) {
+      $('#password').val(generatePass(hex_sha256(randStr),
+          alphanum + $('#specialchars').val()));
+      randStr = '';
+      }
+
+      $('#message').html(randStr.length + ' / ' + winsize);
+      });
+});
+</script>
 
 </body>
 </html>

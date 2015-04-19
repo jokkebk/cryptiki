@@ -1,84 +1,38 @@
-/* Overall page styling */
 body {
-    text-align: center;
-    font-family: Verdana,Arial,Helvetica,sans-serif;
-    font-size: 14px;
-    margin: 0;
-    padding: 0;
+    margin-top: 1em;
+    font-size: 16px;
 }
 
-#container {
-    width: 960px;
-    margin: 0 auto;
-    text-align: left;
+/* Style the entries a bit */
+.entry .name, .entry .username, .entry .password {
+    border: 1px solid #888;
+    border-radius: 3px;
+    margin: 2px;
+    padding: 3px;
 }
 
-/* Header styling */
-#header {
-    border-bottom: 2px solid gray;
-}
-
-#header_inner {
-    margin: 4px;
-}
-
-#header h1 {
-    color: gray;
-    line-height: 1em;
-    margin: 0;
-    font-variant: small-caps;
-    font-size: 18px;
-}
-
-/* Main area styling */
-#main {
-}
-
-#main_inner {
-    padding: 4px;
-}
-
-/* Footer styling */
-#footer {
-    font-size: 11px;
-    border-top: 2px solid gray;
-    color: gray;
-}
-
-#footer_inner {
-    padding: 4px;
-}
-
-#footer a {
-    color: gray;
-    text-decoration: none;
+.entry .name {
     font-weight: bold;
 }
 
-#footer p {
-    margin: 0;
+.entry .username, .entry .password {
+    background-color: #f8f8f8;
 }
 
-/* Content styling */
-table {
-    border-collapse: collapse;
+.entry .glyphicon {
+    font-size: 150%;
 }
 
-h1 {
-    font-size: 18px;
+/* Notes are hidden by default */
+.entry .notes {
+    display: none;
 }
 
-h2 {
-    font-size: 14px;
+/* Allow using text-primary to color only some links */
+.entry a {
+    color: black;
 }
 
-.box {
-    border: 1px solid #ccc;
-    background-color: #eee;
-    padding: 4px;
-}
-
-textarea {
-    font-family: Verdana,Arial,Helvetica,sans-serif;
-    font-size: 14px;
+.editpage {
+    display: none;
 }
