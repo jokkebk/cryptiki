@@ -11,6 +11,8 @@ var Editor = Editor || {};
     NOTE: /^\s+(.*\S)\s*$/ // trim trailing space
   };
 
+  var doTopt = $.extend({}, doT.templateSettings, {strip: false});
+
   var TOHTML = {
     'heading': doT.template('<div class="row"><div class="col-md-12">' +
       '<h2 id="elem{{=it.id}}" contenteditable="true">{{=it.value}}</h2>' +
@@ -41,17 +43,24 @@ var Editor = Editor || {};
         '<div class="col-xs-12">' +
         '<blockquote class="notes" contenteditable="true">{{=it.value.notes.join("<br>")}}</blockquote>' +
         '</div>' +
-        '</div>')
+        '</div>'),
+    'entry_end': doT.template('<div class="row"><div class="col-md-12">' +
+        '<button id="elem{{=it.id}}" class="addbutton btn btn-default">' +
+        '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span> Add new entry' +
+        '</button> ' +
+        '<button id="elem{{=it.id}}" class="sortbutton btn btn-default">' +
+        '<span class="glyphicon glyphicon-sort" aria-hidden="true"></span> Sort entries' +
+        '</button>' +
+        '</div></div>', doTopt)
   };
-
-  var doTopt = $.extend({}, doT.templateSettings, {strip: false});
 
   var TOTEXT = {
     'heading': doT.template('!{{=it.value}}\n\n', doTopt),
     'paragraph': doT.template('{{=it.value.join("\\n")}}\n\n', doTopt),
     'list': doT.template('{{~it.value :value:index}}* {{=value}}\n{{~}}\n', doTopt),
     'entry': doT.template('{{=it.value.name}}: {{=it.value.username}} / {{=it.value.password}}\n' +
-        '{{? it.value.notes.length }}  {{=it.value.notes.join("\\n  ")}}\n{{?}}', doTopt)
+        '{{? it.value.notes.length }}  {{=it.value.notes.join("\\n  ")}}\n{{?}}', doTopt),
+    'entry_end': doT.template('\n', doTopt)
   };
 
   Editor.Editor = function() {
@@ -64,11 +73,10 @@ var Editor = Editor || {};
     this.nextId = 0;
   };
 
-  Editor.Editor.prototype.createElement = function(type, value) {
+  Editor.Editor.prototype.createElement = function(type, value, omitAdd) {
     var elem = {id: this.nextId++, type: type, value: value};
     this.elementMap[elem.id] = elem;
-    this.elements.push(elem.id);
-
+    if(!omitAdd) this.elements.push(elem.id);
     return elem;
   };
 
@@ -84,10 +92,7 @@ var Editor = Editor || {};
 
       if(PATT.EMTPY.exec(line) !== null) {
         state = STATE.BASE; // return to base state
-        continue; // go to next line
-      }
-
-      if((match = PATT.HEAD.exec(line)) !== null) {
+      } else if((match = PATT.HEAD.exec(line)) !== null) {
         element = this.createElement('heading', match[1]);
         state = STATE.BASE; // not in para, list, entry any more
       } else if((match = PATT.LIST.exec(line)) !== null) {
@@ -115,6 +120,27 @@ var Editor = Editor || {};
         element.value.push(line);
       }
     }
+
+    // Nice for loop to insert entry_end after consecutive entries
+    var wasEntry = false, added = [];
+
+    for(i=0; i<this.elements.length; i++) {
+      var elem = this.elementMap[this.elements[i]];
+
+      if(wasEntry && elem.type != 'entry') {
+        var end = this.createElement('entry_end', null, true);
+        added.push(end.id);
+      }
+      added.push(elem.id);
+      wasEntry = (elem.type == 'entry');
+    }
+
+    if(wasEntry) { // one more for the road
+      var end = this.createElement('entry_end', null, true);
+      added.push(end.id);
+    }
+
+    this.elements = added;
   };
 
   Editor.Editor.prototype.toHtml = function() {
@@ -191,6 +217,61 @@ var Editor = Editor || {};
         field.hide(400);
       else
         field.show(400);
+      return false;
+    });
+
+    $(elemId).on('click', '.addbutton', function(ev) {
+      var id = parseInt($(this).attr('id').substr(4));
+      var name, username, password;
+
+      if(null === (name = prompt('Enter service name')))
+        return false;
+      if(null === (username = prompt('Enter service username')))
+        return false;
+      if(null === (password = prompt('Enter service password')))
+        return false;
+
+      var pos = me.elements.indexOf(id);
+      var elem = me.createElement('entry', {
+        name: name,
+        username: username,
+        password: password,
+        notes: []
+      }, true); // omit adding to elements
+
+      me.elements.splice(pos, 0, elem.id); // insert in middle
+
+      $(TOHTML['entry'](elem)).insertBefore($(this).closest('.row'));
+
+      return false;
+    });
+
+    $(elemId).on('click', '.sortbutton', function(ev) {
+      var id = parseInt($(this).attr('id').substr(4));
+      var pos = me.elements.indexOf(id), i = pos;
+      var buttonrow = $(this).closest('.row');
+
+      while(--i >= 0) { // 'entry' at 0 results in i == -1
+        var elem = me.elementMap[me.elements[i]];
+        if(elem.type != 'entry') break;
+        $('#elem' + elem.id).remove(); // remove from old position
+      } 
+
+      var entries = me.elements.splice(i+1, pos-i-1);
+      
+      entries.sort(function(a,b) {
+        var ae = me.elementMap[a].value, be = me.elementMap[b].value;
+        return ae.name < be.name ? -1 : (ae.name > be.name ? 1 : 0);
+      });
+
+      entries.forEach(function(id) {
+        var elem = me.elementMap[id];
+        $(TOHTML['entry'](elem)).insertBefore(buttonrow);
+      });
+
+      me.elements.splice.apply(me.elements, [i+1, 0].concat(entries));
+      //alert('Now I would sort from ' + i + ' to ' + pos);
+
       return false;
     });
   };
