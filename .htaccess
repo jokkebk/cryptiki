@@ -1,3 +1,3 @@
 RewriteEngine on
-RewriteCond $1 !^(index\.html|new\.html|get\.php|put\.php|media|robots\.txt)
+RewriteCond $1 !^(\w+\.html|get\.php|put\.php|media|robots\.txt)
 RewriteRule ^(.*)$ /index.html [L]
