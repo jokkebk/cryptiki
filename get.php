@@ -1,12 +1,12 @@
 <?php
 # AJAX handler to get content for a specific key
 
-if(!$_POST['keyhash']) {
+if(!$_POST['keyhash'] && !$_GET['keyhash']) {
   echo "FAILED: No key defined.";
   exit;
 }
 
-$keyhash = ereg_replace('[^0-9a-f]', '', $_POST['keyhash']);
+$keyhash = ereg_replace('[^0-9a-f]', '', $_POST['keyhash'] ? $_POST['keyhash'] : $_GET['keyhash']);
 
 $mysql = @mysql_connect("localhost", "jokkebk_cryptiki", "7e303d42");
 
