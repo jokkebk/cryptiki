@@ -6,10 +6,10 @@ if(!$_POST['keyhash'] || !$_POST['passhash'] || !$_POST['content']) {
   exit;
 }
 
-$keyhash = ereg_replace('[^0-9a-f]', '', $_POST['keyhash']);
-$passhash = ereg_replace('[^0-9a-f]', '', $_POST['passhash']);
-$contenthash = ereg_replace('[^0-9a-f]', '', $_POST['contenthash']);
-$content = ereg_replace('[^0-9a-zA-Z\+/=]', '', $_POST['content']);
+$keyhash = preg_replace('[^0-9a-f]', '', $_POST['keyhash']);
+$passhash = preg_replace('[^0-9a-f]', '', $_POST['passhash']);
+$contenthash = preg_replace('[^0-9a-f]', '', $_POST['contenthash']);
+$content = preg_replace('[^0-9a-zA-Z\+/=]', '', $_POST['content']);
 
 $MAXSIZE = 65536;
 
@@ -18,15 +18,10 @@ if(strlen($content) > $MAXSIZE) {
   exit;
 }
 
-$mysql = @mysql_connect("localhost", "jokkebk_cryptiki", "7e303d42");
+$mysql = @mysqli_connect("localhost", "jokkebk_cryptiki", "TqUFs!58PKYNarm", "jokkebk_cryptiki");
 
-if(!$mysql || !@mysql_select_db("jokkebk_cryptiki", $mysql)) {
-  echo "FAILED: Database error.";
-  exit;
-}
-
-$result = mysql_query("SELECT passhash, LENGTH(content) AS len FROM pages WHERE keyhash = '$keyhash'");
-$row = mysql_fetch_row($result);
+$result = mysqli_query($mysql, "SELECT passhash, LENGTH(content) AS len FROM pages WHERE keyhash = '$keyhash'");
+$row = mysqli_fetch_row($result);
 
 if($row) {
   $oldlen = (int)$row[1];
@@ -42,14 +37,14 @@ if($row) {
     exit;
   }
 
-  if(!mysql_query("UPDATE pages SET content = '$content', contenthash = '$contenthash', modified = NOW() WHERE keyhash = '$keyhash' AND passhash = '$passhash'")) {
+  if(!mysqli_query($mysql, "UPDATE pages SET content = '$content', contenthash = '$contenthash', modified = NOW() WHERE keyhash = '$keyhash' AND passhash = '$passhash'")) {
     echo "FAILED: Could not update the page.";
     exit;
   }
 
   echo "SUCCESS: " . strlen($content) . " bytes stored.";
 } else {
-  if(!mysql_query("INSERT INTO pages (keyhash, passhash, contenthash, content, modified) VALUES ('$keyhash', '$passhash', '$contenthash', '$content', NOW())")) {
+  if(!mysqli_query($mysql, "INSERT INTO pages (keyhash, passhash, contenthash, content, modified) VALUES ('$keyhash', '$passhash', '$contenthash', '$content', NOW())")) {
     echo "FAILED: Could not save page.";
     exit;
   }

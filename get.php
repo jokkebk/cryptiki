@@ -6,27 +6,22 @@ if(!$_POST['keyhash'] && !$_GET['keyhash']) {
   exit;
 }
 
-$keyhash = ereg_replace('[^0-9a-f]', '', $_POST['keyhash'] ? $_POST['keyhash'] : $_GET['keyhash']);
+$keyhash = preg_replace('[^0-9a-f]', '', $_POST['keyhash'] ? $_POST['keyhash'] : $_GET['keyhash']);
 
-$mysql = @mysql_connect("localhost", "jokkebk_cryptiki", "7e303d42");
+$mysql = @mysqli_connect("localhost", "jokkebk_cryptiki", "TqUFs!58PKYNarm", "jokkebk_cryptiki");
 
 header('Content-type: application/json');
 
-if(!$mysql || !@mysql_select_db("jokkebk_cryptiki", $mysql)) {
-  echo '{"error": "Database error."}';
-  exit;
-}
-
 $sql = "SELECT contenthash, content FROM pages WHERE keyhash = '$keyhash'";
 
-$result = mysql_query($sql);
+$result = mysqli_query($mysql, $sql);
 
-if(mysql_num_rows($result) == 0) {
+if(mysqli_num_rows($result) == 0) {
   $contenthash = '';
   $content = '';
 } else {
-  list($contenthash, $content) = mysql_fetch_row($result);
-  mysql_query("UPDATE pages SET accessed = NOW() WHERE keyhash = '$keyhash'"); # note when accessed
+  list($contenthash, $content) = mysqli_fetch_row($result);
+  mysqli_query("UPDATE pages SET accessed = NOW() WHERE keyhash = '$keyhash'"); # note when accessed
 }
 
 echo json_encode(array('contenthash' => $contenthash, 'content' => $content));
