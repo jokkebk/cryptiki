@@ -11,8 +11,10 @@ body {
     padding: 3px;
 }
 
-.entry .name {
+p.name {
     font-weight: bold;
+    background-color: #008;
+    color: white;
 }
 
 .entry .username, .entry .password {

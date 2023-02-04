@@ -44,8 +44,8 @@ if($row) {
 
   echo "SUCCESS: " . strlen($content) . " bytes stored.";
 } else {
-  if(!mysqli_query($mysql, "INSERT INTO pages (keyhash, passhash, contenthash, content, modified) VALUES ('$keyhash', '$passhash', '$contenthash', '$content', NOW())")) {
-    echo "FAILED: Could not save page.";
+  if(!mysqli_query($mysql, "INSERT INTO pages (keyhash, passhash, contenthash, content, modified, accessed) VALUES ('$keyhash', '$passhash', '$contenthash', '$content', NOW(), NOW())")) {
+    echo "FAILED: Could not save page: " . $mysql->error;
     exit;
   }
 

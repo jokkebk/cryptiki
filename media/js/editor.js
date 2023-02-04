@@ -28,7 +28,7 @@ var Editor = Editor || {};
       '</ul>' +
       '</div></div>'),
     'entry': doT.template('<div id="elem{{=it.id}}" class="row entry">' +
-        '<div class="col-xs-12 col-md-3"><p class="name bg-primary" contenteditable="true">{{=it.value.name}}</p></div>' +
+        '<div class="col-xs-12 col-md-3"><p class="name" contenteditable="true">{{=it.value.name}}</p></div>' +
         '<div class="col-xs-12 col-sm-6 col-md-3"><p class="username" contenteditable="true">{{=it.value.username}}</p></div>' +
         '<div class="col-xs-9 col-sm-4 col-md-3"><p class="password" contenteditable="true">{{=it.value.password}}</p></div>' +
         '<div class="col-xs-3 col-sm-2">' +

@@ -50,6 +50,9 @@
         <button id="togglebutton" type="button" class="btn btn-default editpage">
           <span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Mode
         </button>
+        <button id="backupbutton" type="button" class="btn btn-default">
+          <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Backup
+        </button>
       </form>
 
       <hr class="editpage">
@@ -190,6 +193,16 @@ $(document).ready(function() {
 
   $('#togglebutton').click(function(ev) {
     if(!isVisual()) toVisual(); else toSource();
+  });
+
+  $('#backupbutton').click(function(ev) {
+    var key = $('#pagename').val();
+    if(key == '') {
+      alert('Empty page name!');
+      return;
+    }
+    var keyhash = hex_sha256(key);
+    window.location = 'download.php?keyhash='+keyhash;
   });
 
   editor.attachListeners('#structure');
