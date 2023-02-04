@@ -8,7 +8,8 @@ if(!$_POST['keyhash'] && !$_GET['keyhash']) {
 
 $keyhash = preg_replace('[^0-9a-f]', '', $_POST['keyhash'] ? $_POST['keyhash'] : $_GET['keyhash']);
 
-$mysql = @mysqli_connect("localhost", "jokkebk_cryptiki", "TqUFs!58PKYNarm", "jokkebk_cryptiki");
+include 'config.php'; # get DB_PASSWORD
+$mysql = @mysqli_connect("localhost", "jokkebk_cryptiki", DB_PASSWORD, "jokkebk_cryptiki");
 
 $sql = "SELECT contenthash, content FROM pages WHERE keyhash = '$keyhash'";
 
