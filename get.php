@@ -20,8 +20,10 @@ if(mysqli_num_rows($result) == 0) {
   $content = '';
 } else {
   list($contenthash, $content) = mysqli_fetch_row($result);
-  mysqli_query("UPDATE pages SET accessed = NOW() WHERE keyhash = '$keyhash'"); # note when accessed
+  mysqli_query($mysql, "UPDATE pages SET accessed = NOW() WHERE keyhash = '$keyhash'"); # note when accessed
 }
+
+header("Access-Control-Allow-Origin: *");
 
 if($_GET['raw'] == '1') {
   header('Content-type: text/plain');

@@ -18,7 +18,8 @@ if(strlen($content) > $MAXSIZE) {
   exit;
 }
 
-$mysql = @mysqli_connect("localhost", "jokkebk_cryptiki", "TqUFs!58PKYNarm", "jokkebk_cryptiki");
+include 'config.php'; # get DB_PASSWORD
+$mysql = @mysqli_connect("localhost", "jokkebk_cryptiki", DB_PASSWORD, "jokkebk_cryptiki");
 
 $result = mysqli_query($mysql, "SELECT passhash, LENGTH(content) AS len FROM pages WHERE keyhash = '$keyhash'");
 $row = mysqli_fetch_row($result);
