@@ -11,7 +11,7 @@ $passhash = preg_replace('[^0-9a-f]', '', $_POST['passhash']);
 $contenthash = preg_replace('[^0-9a-f]', '', $_POST['contenthash']);
 $content = preg_replace('[^0-9a-zA-Z\+/=]', '', $_POST['content']);
 
-$MAXSIZE = 65536;
+$MAXSIZE = 65536*2;
 
 if(strlen($content) > $MAXSIZE) {
   echo "FAILED: Current maximum size for a page is $MAXSIZE bytes in encrypted form. Yours was " . strlen($content) . " bytes";
@@ -39,7 +39,7 @@ if($row) {
   }
 
   if(!mysqli_query($mysql, "UPDATE pages SET content = '$content', contenthash = '$contenthash', modified = NOW() WHERE keyhash = '$keyhash' AND passhash = '$passhash'")) {
-    echo "FAILED: Could not update the page.";
+    echo "FAILED: Could not update the page: " . $mysql->error;
     exit;
   }
 
