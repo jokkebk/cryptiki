@@ -2,6 +2,7 @@
 # AJAX handler to get content for a specific key
 
 if(!$_POST['keyhash'] && !$_GET['keyhash']) {
+  http_response_code(400); // Bad Request
   echo "FAILED: No key defined.";
   exit;
 }
