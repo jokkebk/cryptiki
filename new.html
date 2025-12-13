@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Cryptiki Password Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Pico CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/@picocss/pico@2.0.6/css/pico.min.css"
+  />
+
+  <!-- Icon library (no hardcoded SVGs) -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
+
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header.container {
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    header .grid {
+      align-items: flex-end;
+      gap: 0.75rem;
+    }
+
+    header label {
+      font-size: 0.9rem;
+      margin-bottom: 0;
+    }
+
+    header small {
+      font-size: 0.75rem;
+      opacity: 0.8;
+    }
+
+    main.container {
+      flex: 1 0 auto;
+      padding-top: 0.5rem;
+      padding-bottom: 1.5rem;
+    }
+
+    footer.container {
+      flex-shrink: 0;
+      padding-top: 0.5rem;
+      padding-bottom: 1rem;
+      font-size: 0.8rem;
+      text-align: center;
+      opacity: 0.7;
+    }
+
+    .actions-row {
+      margin: 0.5rem 0 1rem;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .actions-row > *:last-child {
+      justify-self: flex-end;
+      text-align: right;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 0.4rem;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .button-group button {
+      white-space: nowrap;
+    }
+
+    .icon-button {
+      padding: 0.35rem 0.5rem;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+    }
+
+    .icon-button i {
+      font-size: 0.9rem;
+    }
+
+    .field-with-icons {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .field-with-icons input {
+      width: 100%;
+    }
+
+    table.compact th,
+    table.compact td {
+      vertical-align: top;
+    }
+
+    table.compact th {
+      white-space: nowrap;
+    }
+
+    td.actions {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .note-toggle {
+      margin-top: 0.25rem;
+    }
+
+    .note-toggle textarea {
+      margin-top: 0.3rem;
+      width: 100%;
+    }
+
+    .note-dot {
+      display: inline-block;
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 999px;
+      background: currentColor;
+      margin-left: 0.3rem;
+    }
+
+    details.tools > summary {
+      margin-top: 0.25rem;
+    }
+
+    @media (max-width: 768px) {
+      header .grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .actions-row {
+        grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+      }
+    }
+  </style>
+
+  <script>
+    // --- Crypto helpers (Web Crypto API) ---
+
+    const API_BASE_URL = window.API_BASE_URL || ""; // same as old VITE_API_BASE_URL default
+    const SALT_STRING = "Cryptiki 2.0";
+    const PBKDF2_ITER = 133700;
+    const KEY_LEN_BYTES = 32; // 256-bit
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    function bytesToHex(bytes) {
+      return Array.from(bytes)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    }
+
+    function hexToBytes(hex) {
+      if (!hex) return new Uint8Array();
+      const arr = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < hex.length; i += 2) {
+        arr[i / 2] = parseInt(hex.substr(i, 2), 16);
+      }
+      return arr;
+    }
+
+    function bytesToBase64(bytes) {
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    function base64ToBytes(base64) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    async function pbkdf2(passwordBytes, saltBytes) {
+      const keyMaterial = await crypto.subtle.importKey(
+        "raw",
+        passwordBytes,
+        { name: "PBKDF2" },
+        false,
+        ["deriveBits"]
+      );
+      const bits = await crypto.subtle.deriveBits(
+        {
+          name: "PBKDF2",
+          hash: "SHA-256",
+          iterations: PBKDF2_ITER,
+          salt: saltBytes,
+        },
+        keyMaterial,
+        KEY_LEN_BYTES * 8
+      );
+      return new Uint8Array(bits);
+    }
+
+    async function sha256Hex(str) {
+      const hash = await crypto.subtle.digest("SHA-256", encoder.encode(str));
+      return bytesToHex(new Uint8Array(hash)).toLowerCase();
+    }
+
+    async function aesCtrEncrypt(plaintext, keyBytes) {
+      const iv = crypto.getRandomValues(new Uint8Array(16));
+      const key = await crypto.subtle.importKey(
+        "raw",
+        keyBytes,
+        { name: "AES-CTR", length: 256 },
+        false,
+        ["encrypt"]
+      );
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: "AES-CTR", counter: iv, length: 128 },
+        key,
+        encoder.encode(plaintext)
+      );
+      return { iv, ciphertext: new Uint8Array(ciphertext) };
+    }
+
+    async function aesCtrDecrypt(ciphertextBytes, keyBytes, ivBytes) {
+      const key = await crypto.subtle.importKey(
+        "raw",
+        keyBytes,
+        { name: "AES-CTR", length: 256 },
+        false,
+        ["decrypt"]
+      );
+      const plaintext = await crypto.subtle.decrypt(
+        { name: "AES-CTR", counter: ivBytes, length: 128 },
+        key,
+        ciphertextBytes
+      );
+      return decoder.decode(plaintext);
+    }
+
+    // --- Alpine app ---
+
+    function cryptikiApp() {
+      return {
+        // state
+        page: "lorem",
+        password: "ipsum",
+        showPass: false,
+        filter: "",
+        entries: [],
+        importText: "",
+        showImport: false,
+        busy: false,
+
+        keyhashHex: null,
+        passkeyHex: null,
+        keyhashBytes: null,
+        passkeyBytes: null,
+        credentialsStored: false,
+
+        init() {
+          if (!("crypto" in window) || !crypto.subtle) {
+            alert("This browser does not support the Web Crypto API.");
+            return;
+          }
+
+          try {
+            const kh = localStorage.getItem("keyhash");
+            const pk = localStorage.getItem("passkey");
+            if (kh && pk) {
+              this.keyhashHex = kh;
+              this.passkeyHex = pk;
+              this.keyhashBytes = hexToBytes(kh);
+              this.passkeyBytes = hexToBytes(pk);
+              this.page = localStorage.getItem("page") || "";
+              this.password = localStorage.getItem("password") || "";
+              this.credentialsStored = true;
+            }
+          } catch (e) {
+            console.error("Failed to load stored credentials", e);
+          }
+        },
+
+        caselessMatch(needle, ...haystack) {
+          if (!needle) return true;
+          const n = String(needle).toUpperCase();
+          return haystack.some((h) =>
+            (h || "").toString().toUpperCase().includes(n)
+          );
+        },
+
+        async calculateKeys(inputPage, inputPassword) {
+          const pageBytes = encoder.encode(inputPage);
+          const saltBytes = encoder.encode(SALT_STRING);
+          const keyhashBytes = await pbkdf2(pageBytes, saltBytes);
+          const keyhashHex = bytesToHex(keyhashBytes);
+
+          const passkeyBytes = await pbkdf2(
+            encoder.encode(inputPassword),
+            keyhashBytes
+          );
+          const passkeyHex = bytesToHex(passkeyBytes);
+
+          return { keyhashBytes, keyhashHex, passkeyBytes, passkeyHex };
+        },
+
+        async storeCredentials() {
+          if (!this.page || !this.password) {
+            alert("Page and password must be set");
+            return;
+          }
+          try {
+            const {
+              keyhashBytes,
+              keyhashHex,
+              passkeyBytes,
+              passkeyHex,
+            } = await this.calculateKeys(this.page, this.password);
+
+            localStorage.setItem("keyhash", keyhashHex);
+            localStorage.setItem("passkey", passkeyHex);
+            localStorage.setItem("page", this.page);
+            localStorage.setItem("password", this.password);
+
+            this.keyhashBytes = keyhashBytes;
+            this.keyhashHex = keyhashHex;
+            this.passkeyBytes = passkeyBytes;
+            this.passkeyHex = passkeyHex;
+            this.credentialsStored = true;
+
+            alert("Credentials stored successfully");
+          } catch (e) {
+            console.error(e);
+            alert("Failed to derive keys");
+          }
+        },
+
+        clearStoredCredentials() {
+          localStorage.removeItem("keyhash");
+          localStorage.removeItem("passkey");
+          localStorage.removeItem("page");
+          localStorage.removeItem("password");
+          this.keyhashHex = null;
+          this.passkeyHex = null;
+          this.keyhashBytes = null;
+          this.passkeyBytes = null;
+          this.credentialsStored = false;
+          alert("Stored credentials have been cleared");
+        },
+
+        addEntry() {
+          const service = prompt("Site");
+          if (service === null) return;
+          const username = prompt("Username");
+          if (username === null) return;
+          const password = prompt("Password");
+          if (password === null) return;
+
+          this.entries.push({
+            service,
+            username,
+            password,
+            text: "",
+          });
+          this.filter = service;
+        },
+
+        sortEntries() {
+          this.entries.sort((a, b) =>
+            (a.service || "").localeCompare(b.service || "")
+          );
+        },
+
+        deleteEntry(index) {
+          this.entries.splice(index, 1);
+        },
+
+        importEntries() {
+          const entryRe = /^(\w.*):\s+(.+) \/ (.+)$/;
+          const lines = (this.importText || "").split("\n");
+          this.entries = [];
+
+          for (const rawLine of lines) {
+            const line = rawLine;
+            if (!line.trim() && !this.entries.length) continue;
+
+            const match = line.match(entryRe);
+            if (match) {
+              this.entries.push({
+                service: match[1],
+                username: match[2],
+                password: match[3],
+                text: "",
+              });
+            } else if (line.startsWith("!")) {
+              this.entries.push({
+                service: line.slice(1),
+                username: "",
+                password: "",
+                text: "",
+              });
+            } else if (this.entries.length) {
+              const prev = this.entries[this.entries.length - 1];
+              if (prev.text.length > 0) prev.text += "\n";
+              prev.text += line.trim();
+            }
+          }
+
+          this.sortEntries();
+          this.showImport = false;
+          this.importText = "";
+        },
+
+        async copy(text) {
+          if (!text) return;
+          try {
+            await navigator.clipboard.writeText(text);
+          } catch (e) {
+            console.error("Clipboard copy failed", e);
+          }
+        },
+
+        async savePage() {
+          if (!this.page || !this.password) {
+            alert("Page and password must be set");
+            return;
+          }
+
+          this.busy = true;
+          await new Promise((r) => setTimeout(r, 10)); // mimic old busy behavior
+
+          let keyhashBytes, keyhashHex, passkeyBytes, passkeyHex;
+          try {
+            if (
+              this.credentialsStored &&
+              localStorage.getItem("page") === this.page &&
+              this.keyhashBytes &&
+              this.passkeyBytes
+            ) {
+              keyhashBytes = this.keyhashBytes;
+              keyhashHex = this.keyhashHex;
+              passkeyBytes = this.passkeyBytes;
+              passkeyHex = this.passkeyHex;
+            } else {
+              ({
+                keyhashBytes,
+                keyhashHex,
+                passkeyBytes,
+                passkeyHex,
+              } = await this.calculateKeys(this.page, this.password));
+            }
+
+            const payload = JSON.stringify(this.entries);
+            const contenthash = await sha256Hex(payload);
+            const { iv, ciphertext } = await aesCtrEncrypt(
+              payload,
+              passkeyBytes
+            );
+
+            const content = {
+              iv: bytesToHex(iv),
+              deriv: "PBKDF2",
+              iter: PBKDF2_ITER,
+              hash: "SHA256",
+              salt: SALT_STRING,
+              crypto: "AES256CTR",
+              encrypted: bytesToBase64(ciphertext),
+            };
+
+            const body = new URLSearchParams({
+              keyhash: keyhashHex,
+              passhash: passkeyHex,
+              contenthash,
+              content: JSON.stringify(content),
+            }).toString();
+
+            const res = await fetch(API_BASE_URL + "/put.php", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+              body,
+            });
+
+            if (!res.ok) {
+              const text = await res.text().catch(() => "");
+              console.error("AJAX error:", res.status, text);
+              alert(
+                `Error saving page: ${res.status} ${res.statusText}\n${text}`
+              );
+            } else {
+              console.log("Page saved");
+              alert("Page saved successfully");
+            }
+          } catch (e) {
+            console.error("Save failed", e);
+            alert("Error saving page");
+          } finally {
+            this.busy = false;
+          }
+        },
+
+        async loadPage() {
+          if (!this.page || !this.password) {
+            alert("Page and password must be set");
+            return;
+          }
+
+          this.busy = true;
+          await new Promise((r) => setTimeout(r, 10));
+
+          let keyhashBytes, keyhashHex, passkeyBytes;
+          try {
+            if (
+              this.credentialsStored &&
+              localStorage.getItem("page") === this.page &&
+              this.keyhashBytes &&
+              this.passkeyBytes
+            ) {
+              keyhashBytes = this.keyhashBytes;
+              keyhashHex = this.keyhashHex;
+              passkeyBytes = this.passkeyBytes;
+            } else {
+              ({
+                keyhashBytes,
+                keyhashHex,
+                passkeyBytes,
+              } = await this.calculateKeys(this.page, this.password));
+            }
+
+            const res = await fetch(
+              API_BASE_URL + "/get.php?keyhash=" + keyhashHex
+            );
+            if (!res.ok) {
+              console.error("HTTP error " + res.status);
+              this.busy = false;
+              return;
+            }
+
+            let { contenthash, content } = await res.json();
+
+            if (!contenthash || !content) {
+              alert("No such page");
+              console.error({ contenthash, content });
+              this.busy = false;
+              return;
+            }
+
+            if (typeof content === "string") {
+              content = JSON.parse(content);
+            }
+
+            const ivBytes = hexToBytes(content.iv);
+            const ciphertextBytes = base64ToBytes(content.encrypted);
+
+            try {
+              const plaintext = await aesCtrDecrypt(
+                ciphertextBytes,
+                passkeyBytes,
+                ivBytes
+              );
+              const plainhash = await sha256Hex(plaintext);
+
+              if (contenthash.toLowerCase() !== plainhash.toLowerCase()) {
+                throw new Error(
+                  `Content hash mismatch: ${contenthash} != ${plainhash}`
+                );
+              }
+
+              this.entries = JSON.parse(plaintext);
+            } catch (e) {
+              console.error(e);
+              alert(
+                "Decryption failed. Please check your page and password."
+              );
+            }
+          } catch (e) {
+            console.error("Load failed", e);
+          } finally {
+            this.busy = false;
+          }
+        },
+      };
+    }
+  </script>
+
+  <!-- Alpine.js (from CDN) -->
+  <script
+    src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
+    defer
+  ></script>
+</head>
+
+<body x-data="cryptikiApp()" x-init="init()">
+  <header class="container">
+    <div class="grid">
+      <div>
+        <label for="page">
+          Page
+          <input
+            id="page"
+            type="text"
+            inputmode="text"
+            autocomplete="off"
+            x-model.trim="page"
+          />
+          <small>Logical “file” name</small>
+        </label>
+      </div>
+
+      <div>
+        <label for="password">
+          Password
+          <div class="field-with-icons">
+            <input
+              id="password"
+              :type="showPass ? 'text' : 'password'"
+              x-model="password"
+              autocomplete="off"
+            />
+            <button
+              type="button"
+              class="secondary icon-button"
+              @click="showPass = !showPass"
+              :aria-pressed="showPass"
+              :title="showPass ? 'Hide password' : 'Show password'"
+            >
+              <i class="fa-regular" :class="showPass ? 'fa-eye-slash' : 'fa-eye'"></i>
+            </button>
+          </div>
+          <small>Used to derive encryption keys</small>
+        </label>
+      </div>
+
+      <div>
+        <label>
+          Actions
+          <button
+            type="button"
+            :aria-busy="busy"
+            @click="entries.length ? savePage() : loadPage()"
+          >
+            <i
+              class="fa-solid"
+              :class="entries.length ? 'fa-floppy-disk' : 'fa-cloud-arrow-down'"
+            ></i>
+            <span x-text="entries.length ? 'Save' : 'Load'"></span>
+          </button>
+          <small x-show="entries.length === 0"
+            >Load existing store</small
+          >
+          <small x-show="entries.length > 0">Save current store</small>
+        </label>
+      </div>
+
+      <div>
+        <label>
+          Tools
+          <details class="tools" role="list">
+            <summary class="secondary" role="button">Tools</summary>
+            <ul>
+              <li>
+                <button
+                  type="button"
+                  class="secondary"
+                  @click="storeCredentials()"
+                >
+                  <i class="fa-solid fa-key"></i>
+                  Cache credentials
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="secondary"
+                  @click="showImport = true"
+                >
+                  <i class="fa-solid fa-file-import"></i>
+                  Import old format
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="secondary"
+                  @click="clearStoredCredentials()"
+                  x-show="credentialsStored"
+                >
+                  <i class="fa-solid fa-eraser"></i>
+                  Clear cached credentials
+                </button>
+              </li>
+            </ul>
+          </details>
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="grid actions-row">
+      <div>
+        <label for="filter" style="margin-bottom: 0">
+          <span class="sr-only">Filter</span>
+          <input
+            id="filter"
+            type="search"
+            placeholder="Filter (* for all)"
+            x-model="filter"
+          />
+        </label>
+      </div>
+      <div class="button-group">
+        <button type="button" class="secondary" @click="sortEntries()">
+          <i class="fa-solid fa-arrow-down-a-z"></i>
+          Sort
+        </button>
+        <button type="button" @click="addEntry()">
+          <i class="fa-solid fa-plus"></i>
+          New entry
+        </button>
+      </div>
+    </div>
+
+    <!-- Import view -->
+    <section x-show="showImport" x-cloak>
+      <textarea
+        x-model="importText"
+        rows="8"
+        placeholder="Paste old Cryptiki passwords here"
+      ></textarea>
+      <div class="button-group" style="margin-top: 0.5rem">
+        <button type="button" @click="importEntries()">Import</button>
+        <button
+          type="button"
+          class="secondary"
+          @click="showImport = false; importText = ''"
+        >
+          Cancel
+        </button>
+      </div>
+    </section>
+
+    <!-- Empty state -->
+    <section x-show="!showImport && entries.length === 0" x-cloak>
+      <h3>No entries yet.</h3>
+      <p>Add your first login with <strong>New entry</strong>.</p>
+    </section>
+
+    <!-- Security notice when there are entries but filter is empty -->
+    <section
+      x-show="!showImport && entries.length > 0 && !filter"
+      x-cloak
+    >
+      <p>
+        For your security (e.g. someone looking over your shoulder), passwords
+        are hidden until you choose what to show.
+      </p>
+      <button
+        type="button"
+        class="contrast"
+        @click="filter = '*'"
+      >
+        Show all
+      </button>
+    </section>
+
+    <!-- Entries table -->
+    <section
+      x-show="!showImport && entries.length > 0 && filter"
+      x-cloak
+    >
+      <table class="compact">
+        <thead>
+          <tr>
+            <th>Site</th>
+            <th>Username</th>
+            <th style="min-width: 13rem">Password &amp; note</th>
+            <th>Operations</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="(entry, index) in entries" :key="index">
+            <tr
+              x-data="{ showPassword: false, noteOpen: false }"
+              x-show="filter === '*' || caselessMatch(filter, entry.service, entry.username, entry.text)"
+            >
+              <td>
+                <input
+                  type="text"
+                  x-model="entry.service"
+                  placeholder="Site"
+                />
+              </td>
+              <td>
+                <div class="field-with-icons">
+                  <input
+                    type="text"
+                    x-model="entry.username"
+                    placeholder="Username"
+                  />
+                  <button
+                    type="button"
+                    class="secondary icon-button"
+                    @click="$root.copy(entry.username)"
+                    title="Copy username"
+                  >
+                    <i class="fa-regular fa-copy"></i>
+                  </button>
+                </div>
+              </td>
+              <td>
+                <div class="field-with-icons">
+                  <input
+                    :type="showPassword ? 'text' : 'password'"
+                    x-model="entry.password"
+                    placeholder="Password"
+                  />
+                  <button
+                    type="button"
+                    class="secondary icon-button"
+                    @click="$root.copy(entry.password)"
+                    title="Copy password"
+                  >
+                    <i class="fa-regular fa-copy"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="secondary icon-button"
+                    @click="showPassword = !showPassword"
+                    :title="showPassword ? 'Hide password' : 'Show password'"
+                  >
+                    <i
+                      class="fa-regular"
+                      :class="showPassword ? 'fa-eye-slash' : 'fa-eye'"
+                    ></i>
+                  </button>
+                </div>
+                <div class="note-toggle">
+                  <button
+                    type="button"
+                    class="secondary"
+                    @click="noteOpen = !noteOpen"
+                  >
+                    <i class="fa-regular fa-note-sticky"></i>
+                    <span x-text="noteOpen ? 'Hide note' : 'Note'"></span>
+                    <span
+                      x-show="entry.text && entry.text.length"
+                      class="note-dot"
+                      aria-hidden="true"
+                    ></span>
+                  </button>
+                  <textarea
+                    x-show="noteOpen"
+                    x-model="entry.text"
+                    rows="2"
+                    placeholder="Secure note…"
+                    x-cloak
+                  ></textarea>
+                </div>
+              </td>
+              <td class="actions">
+                <button
+                  type="button"
+                  class="secondary"
+                  title="Delete entry"
+                  @click="$root.deleteEntry(index)"
+                >
+                  <i class="fa-regular fa-trash-can"></i>
+                </button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer class="container">
+    &copy; Joonas Pihlajamaa. All rights reserved.
+  </footer>
+</body>
+</html>
