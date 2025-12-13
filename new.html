@@ -9,751 +9,281 @@
     :root {
       color-scheme: light;
       --bg: #f6f7fb;
-      --surface: #ffffff;
-      --surface-muted: #f1f5f9;
+      --surface: #fff;
       --text: #0f172a;
       --muted: #64748b;
       --border: #e2e8f0;
-      --shadow: 0 1px 2px rgba(15, 23, 42, 0.06),
-        0 8px 24px rgba(15, 23, 42, 0.08);
+      --shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.08);
       --radius: 14px;
       --radius-sm: 10px;
       --primary: #2563eb;
       --primary-hover: #1d4ed8;
       --danger: #dc2626;
-      --danger-hover: #b91c1c;
-      --focus: 0 0 0 4px rgba(37, 99, 235, 0.18);
+      --focus: 0 0 0 4px rgba(37,99,235,.18);
       --max: 1100px;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
       min-height: 100vh;
       background: var(--bg);
       color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
-        Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      line-height: 1.45;
+      font: 1rem/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
     }
 
-    a {
-      color: var(--primary);
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
 
-    .container {
-      width: min(var(--max), calc(100% - 2rem));
-      margin-inline: auto;
-    }
+    .container { width: min(var(--max), calc(100% - 2rem)); margin-inline: auto; }
+    [x-cloak] { display: none !important; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
-    [x-cloak] {
-      display: none !important;
-    }
+    /* Utilities */
+    .flex { display: flex; align-items: center; }
+    .flex-wrap { flex-wrap: wrap; }
+    .gap-sm { gap: .5rem; }
+    .gap-md { gap: .65rem; }
+    .justify-end { justify-content: flex-end; }
+    .justify-between { justify-content: space-between; }
+    .flex-1 { flex: 1 1 auto; }
+    .mt-sm { margin-top: .5rem; }
+    .mt-md { margin-top: .75rem; }
 
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
+    /* Header */
+    .app-header { background: var(--bg); border-bottom: 1px solid rgba(226,232,240,.85); }
+    .header-inner { padding: .85rem 0; display: grid; gap: .75rem; }
+    .brand { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .brand h1 { margin: 0; font-size: 1.1rem; letter-spacing: .2px; }
+    .tagline { margin-top: .15rem; font-size: .9rem; color: var(--muted); }
 
-    .app-header {
-      position: static;
-      background: var(--bg);
-      border-bottom: 1px solid rgba(226, 232, 240, 0.85);
-    }
-
-    .header-inner {
-      padding: 0.85rem 0;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.75rem;
-    }
-
-    .brand {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .brand h1 {
-      margin: 0;
-      font-size: 1.1rem;
-      letter-spacing: 0.2px;
-    }
-
-    .tagline {
-      margin-top: 0.15rem;
-      font-size: 0.9rem;
-      color: var(--muted);
-    }
-
+    /* Badge */
     .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.3rem 0.6rem;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      border-radius: 999px;
-      font-size: 0.85rem;
-      color: var(--muted);
-      white-space: nowrap;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .3rem .6rem; border: 1px solid var(--border);
+      background: var(--surface); border-radius: 999px;
+      font-size: .85rem; color: var(--muted); white-space: nowrap;
+    }
+    .badge-dot {
+      width: .55rem; height: .55rem; border-radius: 999px;
+      background: var(--dot, #94a3b8);
+      box-shadow: 0 0 0 3px var(--ring, rgba(148,163,184,.18));
     }
 
-	    .badge-dot {
-	      width: 0.55rem;
-	      height: 0.55rem;
-	      border-radius: 999px;
-	      background: var(--badge-dot, #94a3b8);
-	      box-shadow: 0 0 0 3px var(--badge-ring, rgba(148, 163, 184, 0.18));
-	    }
+    /* Panels & Cards */
+    .panel, .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: .75rem;
+    }
+    .panel-title { margin: 0 0 .6rem; font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+    .help { margin-top: .2rem; font-size: .82rem; color: var(--muted); }
 
-    .panels {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.75rem;
+    /* Forms */
+    .form-grid { display: grid; gap: .7rem; }
+    .field { display: flex; flex-direction: column; gap: .35rem; min-width: 0; }
+    .field > span { font-size: .86rem; color: var(--muted); }
+    .input-row { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+
+    input, textarea {
+      width: 100%; padding: .55rem .65rem;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: #fff; color: var(--text); font-size: .95rem;
+    }
+    textarea { resize: vertical; }
+    input:focus, textarea:focus, summary:focus {
+      outline: none; border-color: rgba(37,99,235,.55); box-shadow: var(--focus);
     }
 
-    .panel,
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: none;
-      padding: 0.75rem;
-    }
-
-    .panel-title {
-      margin: 0 0 0.6rem;
-      font-size: 0.78rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.7rem;
-    }
-
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      min-width: 0;
-    }
-
-    .field > span {
-      font-size: 0.86rem;
-      color: var(--muted);
-    }
-
-    .help {
-      margin-top: 0.2rem;
-      font-size: 0.82rem;
-      color: var(--muted);
-    }
-
-    .input-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      min-width: 0;
-    }
-
-    input,
-    textarea {
-      width: 100%;
-      padding: 0.55rem 0.65rem;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: #fff;
-      color: var(--text);
-      font-size: 0.95rem;
-    }
-
-    textarea {
-      resize: vertical;
-    }
-
-    input:focus,
-    textarea:focus,
-    summary:focus {
-      outline: none;
-      border-color: rgba(37, 99, 235, 0.55);
-      box-shadow: var(--focus);
-    }
-
+    /* Buttons */
     .btn {
-      appearance: none;
-      border: 1px solid var(--border);
-      background: var(--surface-muted);
-      color: var(--text);
-      border-radius: 12px;
-      padding: 0.55rem 0.7rem;
-      font-weight: 650;
-      font-size: 0.95rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      white-space: nowrap;
-      user-select: none;
+      appearance: none; border: 1px solid var(--border);
+      background: #f1f5f9; color: var(--text); border-radius: 12px;
+      padding: .55rem .7rem; font-weight: 650; font-size: .95rem;
+      cursor: pointer; display: inline-flex; align-items: center;
+      justify-content: center; gap: .5rem; white-space: nowrap; user-select: none;
     }
+    .btn:hover { background: #e8eefc; border-color: #cbd5e1; }
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 
-    .btn:hover {
-      background: #e8eefc;
-      border-color: #cbd5e1;
-    }
+    .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 
-	    .btn:active {
-	      transform: translateY(1px);
-	    }
+    .btn-ghost { background: transparent; }
+    .btn-ghost:hover { background: rgba(2,6,23,.05); border-color: #cbd5e1; }
 
-	    .btn:disabled {
-	      opacity: 0.55;
-	      cursor: not-allowed;
-	      transform: none;
-	    }
+    .btn-danger { background: transparent; border-color: rgba(220,38,38,.35); color: var(--danger); }
+    .btn-danger:hover { background: rgba(220,38,38,.08); border-color: rgba(220,38,38,.55); }
 
-    .btn-primary {
-      background: var(--primary);
-      border-color: var(--primary);
-      color: #fff;
-    }
-    .btn-primary:hover {
-      background: var(--primary-hover);
-      border-color: var(--primary-hover);
-    }
+    .btn-mini { padding: .4rem .55rem; border-radius: var(--radius-sm); font-size: .9rem; }
+    .btn-icon { padding: .4rem; width: 2.25rem; gap: 0; line-height: 1; }
 
-    .btn-ghost {
-      background: transparent;
-    }
-    .btn-ghost:hover {
-      background: rgba(2, 6, 23, 0.05);
-      border-color: #cbd5e1;
-    }
+    .btn-note { position: relative; }
+    .btn-note .note-dot { position: absolute; top: .4rem; right: .4rem; width: .45rem; height: .45rem; }
 
-	    .btn-mini {
-	      padding: 0.4rem 0.55rem;
-	      border-radius: var(--radius-sm);
-	      font-size: 0.9rem;
-	    }
+    .icon { width: 1.05rem; height: 1.05rem; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-	    .btn-icon {
-	      padding: 0.4rem;
-	      width: 2.25rem;
-	      gap: 0;
-	      line-height: 1;
-	    }
-
-	    .btn-note {
-	      position: relative;
-	    }
-
-	    .btn-note .note-dot {
-	      position: absolute;
-	      top: 0.4rem;
-	      right: 0.4rem;
-	      width: 0.45rem;
-	      height: 0.45rem;
-	      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
-	    }
-
-	    .icon {
-	      width: 1.05rem;
-	      height: 1.05rem;
-	      stroke: currentColor;
-	      fill: none;
-	      stroke-width: 2;
-	      stroke-linecap: round;
-	      stroke-linejoin: round;
-	    }
-
-	    .sr-only {
-	      position: absolute;
-	      width: 1px;
-	      height: 1px;
-	      padding: 0;
-	      margin: -1px;
-	      overflow: hidden;
-	      clip: rect(0, 0, 0, 0);
-	      white-space: nowrap;
-	      border: 0;
-	    }
-
-    .btn-danger-ghost {
-      background: transparent;
-      border-color: rgba(220, 38, 38, 0.35);
-      color: var(--danger);
-    }
-    .btn-danger-ghost:hover {
-      background: rgba(220, 38, 38, 0.08);
-      border-color: rgba(220, 38, 38, 0.55);
-    }
-
-    button[aria-busy="true"] {
-      opacity: 0.78;
-      pointer-events: none;
-    }
-
+    button[aria-busy="true"] { opacity: .78; pointer-events: none; }
     button[aria-busy="true"]::after {
-      content: "";
-      width: 1em;
-      height: 1em;
-      margin-left: 0.55rem;
-      border-radius: 999px;
-      border: 2px solid rgba(15, 23, 42, 0.25);
-      border-top-color: rgba(15, 23, 42, 0.65);
-      animation: spin 0.7s linear infinite;
+      content: ""; width: 1em; height: 1em; margin-left: .55rem;
+      border-radius: 999px; border: 2px solid rgba(15,23,42,.25);
+      border-top-color: rgba(15,23,42,.65); animation: spin .7s linear infinite;
     }
+    .btn-primary[aria-busy="true"]::after { border-color: rgba(255,255,255,.55); border-top-color: #fff; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    .btn-primary[aria-busy="true"]::after {
-      border-color: rgba(255, 255, 255, 0.55);
-      border-top-color: #fff;
+    /* Menu */
+    details.tools > summary { list-style: none; }
+    details.tools > summary::-webkit-details-marker { display: none; }
+    details.tools { position: relative; }
+    .menu {
+      position: absolute; right: 0; top: calc(100% + .5rem);
+      padding: .45rem; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); box-shadow: var(--shadow);
+      display: flex; flex-direction: column; gap: .4rem; min-width: 240px;
     }
+    .menu .btn { width: 100%; justify-content: flex-start; }
+    .menu-sep { height: 1px; background: var(--border); margin: .15rem 0; }
 
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
+    /* Main */
+    main { padding: .85rem 0 2rem; }
+    .content-header { display: flex; flex-direction: column; gap: .65rem; margin-bottom: .75rem; }
+    .content-actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; align-items: center; }
 
-    details.tools > summary {
-      list-style: none;
-    }
+    /* Entries */
+    .entries { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .entry-card { border: 0; border-bottom: 1px solid var(--border); border-radius: 0; box-shadow: none; padding: .65rem; background: transparent; }
+    .entries > .entry-card:last-child { border-bottom: 0; }
+    .entry-top { display: grid; gap: .55rem; }
+    .entry-top .site { min-width: 0; }
 
-	    details.tools > summary::-webkit-details-marker {
-	      display: none;
-	    }
+    .note-dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 999px; background: #f59e0b; }
 
-	    details.tools {
-	      position: relative;
-	    }
-
-	    .toolbar-row {
-	      display: flex;
-	      flex-wrap: wrap;
-	      gap: 0.5rem;
-	      align-items: center;
-	    }
-
-	    .menu {
-	      position: absolute;
-	      right: 0;
-	      top: calc(100% + 0.5rem);
-	      padding: 0.45rem;
-	      border: 1px solid var(--border);
-	      border-radius: var(--radius);
-	      background: var(--surface);
-	      box-shadow: var(--shadow);
-	      display: flex;
-	      flex-direction: column;
-	      gap: 0.4rem;
-	      min-width: 240px;
-	    }
-
-	    .menu .btn {
-	      width: 100%;
-	      justify-content: flex-start;
-	    }
-
-	    .menu-sep {
-	      height: 1px;
-	      background: var(--border);
-	      margin: 0.15rem 0;
-	    }
-
-    main {
-      padding: 0.85rem 0 2rem;
-    }
-
-    .content-header {
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .content-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      justify-content: flex-end;
-      align-items: center;
-    }
-
-    .entries {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-
-    .entry-card {
-      background: transparent;
-      border: 0;
-      border-bottom: 1px solid var(--border);
-      border-radius: 0;
-      box-shadow: none;
-      padding: 0.65rem;
-    }
-
-    .entry-top {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.55rem;
-    }
-
-    .entry-top .site {
-      min-width: 0;
-    }
-
-    .entry-grid {
-      margin-top: 0.55rem;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.55rem;
-    }
-
-    .note-toggle {
-      margin-top: 0.45rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .entries > .entry-card:last-child {
-      border-bottom: 0;
-    }
-
-	    .note-dot {
-	      display: inline-block;
-	      width: 0.55rem;
-	      height: 0.55rem;
-	      border-radius: 999px;
-	      background: #f59e0b;
-	    }
-
-    footer {
-      padding: 1.5rem 0 2rem;
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.86rem;
-    }
+    footer { padding: 1.5rem 0 2rem; text-align: center; color: var(--muted); font-size: .86rem; }
 
     @media (min-width: 900px) {
-      .panels {
-        grid-template-columns: 1.25fr 1fr;
-        align-items: start;
-      }
-
-      .form-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .content-header {
-        flex-direction: row;
-        align-items: flex-end;
-        justify-content: space-between;
-      }
-
-      .entry-top {
-        grid-template-columns: 1.3fr 1fr 1.2fr auto;
-        align-items: center;
-        column-gap: 0.6rem;
-      }
-
-      .entry-grid {
-        grid-template-columns: 1fr;
-      }
+      .form-grid { grid-template-columns: 1fr 1fr; }
+      .content-header { flex-direction: row; align-items: flex-end; justify-content: space-between; }
+      .entry-top { grid-template-columns: 1.3fr 1fr 1.2fr auto; align-items: center; column-gap: .6rem; }
     }
   </style>
 
   <script>
-    // --- Crypto helpers (Web Crypto API) ---
+    const API_BASE_URL = (window.API_BASE_URL?.trim() || (location.protocol === "file:" ? "https://cryptiki.com" : "")).replace(/\/+$/, "");
+    const SALT = "Cryptiki 2.0", ITER = 133700, enc = new TextEncoder(), dec = new TextDecoder();
 
-    // API base URL:
-    // - When served from a web origin, default to same-origin ("").
-    // - When opened locally (file://), default to https://cryptiki.com for easy testing.
-    const API_BASE_URL = (() => {
-      const explicit = (window.API_BASE_URL || "").trim();
-      const inferred = window.location.protocol === "file:" ? "https://cryptiki.com" : "";
-      const base = (explicit || inferred).trim();
-      return base.replace(/\/+$/, "");
-    })();
-    const SALT_STRING = "Cryptiki 2.0";
-    const PBKDF2_ITER = 133700;
-    const KEY_LEN_BYTES = 32; // 256-bit
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
+    const hex = b => [...b].map(x => x.toString(16).padStart(2, "0")).join("");
+    const unhex = h => h ? new Uint8Array(h.match(/.{2}/g).map(x => parseInt(x, 16))) : new Uint8Array();
+    const b64 = b => btoa(String.fromCharCode(...b));
+    const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 
-    function bytesToHex(bytes) {
-      return Array.from(bytes)
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
+    async function pbkdf2(pwd, salt) {
+      const key = await crypto.subtle.importKey("raw", pwd, "PBKDF2", false, ["deriveBits"]);
+      return new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", iterations: ITER, salt }, key, 256));
     }
 
-    function hexToBytes(hex) {
-      if (!hex) return new Uint8Array();
-      const arr = new Uint8Array(hex.length / 2);
-      for (let i = 0; i < hex.length; i += 2) {
-        arr[i / 2] = parseInt(hex.substr(i, 2), 16);
-      }
-      return arr;
+    async function sha256(s) {
+      return hex(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(s)))).toLowerCase();
     }
 
-    function bytesToBase64(bytes) {
-      let binary = "";
-      for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      return btoa(binary);
-    }
-
-    function base64ToBytes(base64) {
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return bytes;
-    }
-
-    async function pbkdf2(passwordBytes, saltBytes) {
-      const keyMaterial = await crypto.subtle.importKey(
-        "raw",
-        passwordBytes,
-        { name: "PBKDF2" },
-        false,
-        ["deriveBits"]
-      );
-      const bits = await crypto.subtle.deriveBits(
-        {
-          name: "PBKDF2",
-          hash: "SHA-256",
-          iterations: PBKDF2_ITER,
-          salt: saltBytes,
-        },
-        keyMaterial,
-        KEY_LEN_BYTES * 8
-      );
-      return new Uint8Array(bits);
-    }
-
-    async function sha256Hex(str) {
-      const hash = await crypto.subtle.digest("SHA-256", encoder.encode(str));
-      return bytesToHex(new Uint8Array(hash)).toLowerCase();
-    }
-
-    async function aesCtrEncrypt(plaintext, keyBytes) {
+    async function aesEncrypt(text, key) {
       const iv = crypto.getRandomValues(new Uint8Array(16));
-      const key = await crypto.subtle.importKey(
-        "raw",
-        keyBytes,
-        { name: "AES-CTR", length: 256 },
-        false,
-        ["encrypt"]
-      );
-      const ciphertext = await crypto.subtle.encrypt(
-        { name: "AES-CTR", counter: iv, length: 128 },
-        key,
-        encoder.encode(plaintext)
-      );
-      return { iv, ciphertext: new Uint8Array(ciphertext) };
+      const k = await crypto.subtle.importKey("raw", key, { name: "AES-CTR", length: 256 }, false, ["encrypt"]);
+      const ct = await crypto.subtle.encrypt({ name: "AES-CTR", counter: iv, length: 128 }, k, enc.encode(text));
+      return { iv, ct: new Uint8Array(ct) };
     }
 
-    async function aesCtrDecrypt(ciphertextBytes, keyBytes, ivBytes) {
-      const key = await crypto.subtle.importKey(
-        "raw",
-        keyBytes,
-        { name: "AES-CTR", length: 256 },
-        false,
-        ["decrypt"]
-      );
-      const plaintext = await crypto.subtle.decrypt(
-        { name: "AES-CTR", counter: ivBytes, length: 128 },
-        key,
-        ciphertextBytes
-      );
-      return decoder.decode(plaintext);
+    async function aesDecrypt(ct, key, iv) {
+      const k = await crypto.subtle.importKey("raw", key, { name: "AES-CTR", length: 256 }, false, ["decrypt"]);
+      return dec.decode(await crypto.subtle.decrypt({ name: "AES-CTR", counter: iv, length: 128 }, k, ct));
     }
-
-    // --- Alpine app ---
 
     function cryptikiApp() {
       return {
-        // state
         apiBaseUrl: API_BASE_URL,
-        page: "",
-        password: "",
-        showPass: false,
-        filter: "",
-        entries: [],
-        importText: "",
-        showImport: false,
-        busy: false,
-        loaded: false,
-        dirty: false,
-        lastSyncedPage: null,
-
-        keyhashHex: null,
-        passkeyHex: null,
-        keyhashBytes: null,
-        passkeyBytes: null,
-        credentialsStored: false,
+        page: "", password: "", showPass: false, filter: "",
+        entries: [], importText: "", showImport: false,
+        busy: false, loaded: false, dirty: false, lastSyncedPage: null,
+        keys: null, credentialsStored: false,
 
         init() {
-          if (!("crypto" in window) || !crypto.subtle) {
-            alert("This browser does not support the Web Crypto API.");
-            return;
-          }
-
+          if (!crypto?.subtle) return alert("Web Crypto API not supported.");
           try {
-            const kh = localStorage.getItem("keyhash");
-            const pk = localStorage.getItem("passkey");
-            if (kh && pk) {
-              this.keyhashHex = kh;
-              this.passkeyHex = pk;
-              this.keyhashBytes = hexToBytes(kh);
-              this.passkeyBytes = hexToBytes(pk);
-              this.page = localStorage.getItem("page") || "";
-              this.password = localStorage.getItem("password") || "";
+            const stored = ["keyhash", "passkey", "page", "password"].map(k => localStorage.getItem(k));
+            if (stored[0] && stored[1]) {
+              this.keys = { kh: stored[0], pk: stored[1], khB: unhex(stored[0]), pkB: unhex(stored[1]) };
+              this.page = stored[2] || "";
+              this.password = stored[3] || "";
               this.credentialsStored = true;
             }
-          } catch (e) {
-            console.error("Failed to load stored credentials", e);
-          }
+          } catch (e) { console.error("Failed to load credentials", e); }
         },
 
-        sessionReady() {
-          return !!(this.page && this.password);
-        },
-
-        markDirty() {
-          this.dirty = true;
-        },
+        sessionReady() { return !!(this.page && this.password); },
+        markDirty() { this.dirty = true; },
 
         statusLabel() {
           if (!this.sessionReady()) return "Enter page & password";
-          if (this.busy) return "Working…";
+          if (this.busy) return "Working...";
           if (this.dirty) return "Unsaved changes";
-          if (this.loaded) return "Saved";
-          return "Not loaded";
+          return this.loaded ? "Saved" : "Not loaded";
         },
 
-        statusBadgeStyle() {
-          if (!this.sessionReady()) {
-            return "--badge-dot:#94a3b8; --badge-ring: rgba(148, 163, 184, 0.18)";
-          }
-          if (this.busy) {
-            return "--badge-dot:#0ea5e9; --badge-ring: rgba(14, 165, 233, 0.14)";
-          }
-          if (this.dirty) {
-            return "--badge-dot:#f59e0b; --badge-ring: rgba(245, 158, 11, 0.14)";
-          }
-          if (this.loaded) {
-            return "--badge-dot:#16a34a; --badge-ring: rgba(22, 163, 74, 0.12)";
-          }
-          return "--badge-dot:#94a3b8; --badge-ring: rgba(148, 163, 184, 0.18)";
+        statusStyle() {
+          const styles = {
+            default: "--dot:#94a3b8;--ring:rgba(148,163,184,.18)",
+            busy: "--dot:#0ea5e9;--ring:rgba(14,165,233,.14)",
+            dirty: "--dot:#f59e0b;--ring:rgba(245,158,11,.14)",
+            saved: "--dot:#16a34a;--ring:rgba(22,163,74,.12)"
+          };
+          if (!this.sessionReady()) return styles.default;
+          if (this.busy) return styles.busy;
+          if (this.dirty) return styles.dirty;
+          return this.loaded ? styles.saved : styles.default;
         },
 
-        caselessMatch(needle, ...haystack) {
+        match(needle, ...hay) {
           if (!needle) return true;
-          const n = String(needle).toUpperCase();
-          return haystack.some((h) =>
-            (h || "").toString().toUpperCase().includes(n)
-          );
+          const n = needle.toUpperCase();
+          return hay.some(h => (h || "").toString().toUpperCase().includes(n));
         },
 
-        async calculateKeys(inputPage, inputPassword) {
-          const pageBytes = encoder.encode(inputPage);
-          const saltBytes = encoder.encode(SALT_STRING);
-          const keyhashBytes = await pbkdf2(pageBytes, saltBytes);
-          const keyhashHex = bytesToHex(keyhashBytes);
+        async deriveKeys(page, pwd) {
+          const khB = await pbkdf2(enc.encode(page), enc.encode(SALT));
+          const pkB = await pbkdf2(enc.encode(pwd), khB);
+          return { kh: hex(khB), pk: hex(pkB), khB, pkB };
+        },
 
-          const passkeyBytes = await pbkdf2(
-            encoder.encode(inputPassword),
-            keyhashBytes
-          );
-          const passkeyHex = bytesToHex(passkeyBytes);
-
-          return { keyhashBytes, keyhashHex, passkeyBytes, passkeyHex };
+        async getKeys() {
+          if (this.credentialsStored && localStorage.getItem("page") === this.page && this.keys) return this.keys;
+          return await this.deriveKeys(this.page, this.password);
         },
 
         async storeCredentials() {
-          if (!this.page || !this.password) {
-            alert("Page and password must be set");
-            return;
-          }
+          if (!this.page || !this.password) return alert("Page and password required");
           try {
-            const {
-              keyhashBytes,
-              keyhashHex,
-              passkeyBytes,
-              passkeyHex,
-            } = await this.calculateKeys(this.page, this.password);
-
-            localStorage.setItem("keyhash", keyhashHex);
-            localStorage.setItem("passkey", passkeyHex);
+            const keys = await this.deriveKeys(this.page, this.password);
+            localStorage.setItem("keyhash", keys.kh);
+            localStorage.setItem("passkey", keys.pk);
             localStorage.setItem("page", this.page);
             localStorage.setItem("password", this.password);
-
-            this.keyhashBytes = keyhashBytes;
-            this.keyhashHex = keyhashHex;
-            this.passkeyBytes = passkeyBytes;
-            this.passkeyHex = passkeyHex;
+            this.keys = keys;
             this.credentialsStored = true;
-
-            alert("Credentials stored successfully");
-          } catch (e) {
-            console.error(e);
-            alert("Failed to derive keys");
-          }
+            alert("Credentials stored");
+          } catch (e) { console.error(e); alert("Failed to derive keys"); }
         },
 
-        clearStoredCredentials() {
-          localStorage.removeItem("keyhash");
-          localStorage.removeItem("passkey");
-          localStorage.removeItem("page");
-          localStorage.removeItem("password");
-          this.keyhashHex = null;
-          this.passkeyHex = null;
-          this.keyhashBytes = null;
-          this.passkeyBytes = null;
+        clearCredentials() {
+          ["keyhash", "passkey", "page", "password"].forEach(k => localStorage.removeItem(k));
+          this.keys = null;
           this.credentialsStored = false;
-          alert("Stored credentials have been cleared");
+          alert("Credentials cleared");
         },
 
-        clearAllEntries() {
+        clearEntries() {
           if (!this.entries.length) return;
-          if (
-            !confirm(
-              "Clear all entries from the current view?\n\nThis only changes your local state until you save."
-            )
-          ) {
-            return;
-          }
+          if (!confirm("Clear all entries? (Local only until saved)")) return;
           this.entries = [];
           this.filter = "";
           this.markDirty();
@@ -766,298 +296,114 @@
           if (username === null) return;
           const password = prompt("Password");
           if (password === null) return;
-
-          this.entries.push({
-            service,
-            username,
-            password,
-            text: "",
-          });
+          this.entries.push({ service, username, password, text: "" });
           this.filter = service;
           this.markDirty();
         },
 
         sortEntries() {
-          this.entries.sort((a, b) =>
-            (a.service || "").localeCompare(b.service || "")
-          );
+          this.entries.sort((a, b) => (a.service || "").localeCompare(b.service || ""));
           this.markDirty();
         },
 
-        deleteEntry(index) {
-          this.entries.splice(index, 1);
-          this.markDirty();
-        },
+        deleteEntry(i) { this.entries.splice(i, 1); this.markDirty(); },
 
         importEntries() {
-          const entryRe = /^(\w.*):\s+(.+) \/ (.+)$/;
-          const lines = (this.importText || "").split("\n");
+          const re = /^(\w.*):\s+(.+) \/ (.+)$/;
           this.entries = [];
-
-          for (const rawLine of lines) {
-            const line = rawLine;
+          for (const line of this.importText.split("\n")) {
             if (!line.trim() && !this.entries.length) continue;
-
-            const match = line.match(entryRe);
-            if (match) {
-              this.entries.push({
-                service: match[1],
-                username: match[2],
-                password: match[3],
-                text: "",
-              });
-            } else if (line.startsWith("!")) {
-              this.entries.push({
-                service: line.slice(1),
-                username: "",
-                password: "",
-                text: "",
-              });
-            } else if (this.entries.length) {
-              const prev = this.entries[this.entries.length - 1];
-              if (prev.text.length > 0) prev.text += "\n";
-              prev.text += line.trim();
+            const m = line.match(re);
+            if (m) this.entries.push({ service: m[1], username: m[2], password: m[3], text: "" });
+            else if (line.startsWith("!")) this.entries.push({ service: line.slice(1), username: "", password: "", text: "" });
+            else if (this.entries.length) {
+              const prev = this.entries.at(-1);
+              prev.text += (prev.text ? "\n" : "") + line.trim();
             }
           }
-
           this.sortEntries();
           this.showImport = false;
           this.importText = "";
-          this.markDirty();
         },
 
         async copy(text) {
-          if (!text) return false;
-
-          try {
-            if (
-              typeof navigator !== "undefined" &&
-              navigator.clipboard &&
-              typeof navigator.clipboard.writeText === "function" &&
-              (window.isSecureContext ?? false)
-            ) {
-              await navigator.clipboard.writeText(text);
-              return true;
-            }
-          } catch (e) {
-            console.warn("Clipboard API copy failed, falling back", e);
-          }
-
-          try {
-            const textarea = document.createElement("textarea");
-            textarea.value = text;
-            textarea.setAttribute("readonly", "");
-            textarea.style.position = "fixed";
-            textarea.style.top = "-1000px";
-            textarea.style.left = "-1000px";
-            textarea.style.opacity = "0";
-            document.body.appendChild(textarea);
-            textarea.select();
-            textarea.setSelectionRange(0, textarea.value.length);
-            const ok = document.execCommand("copy");
-            textarea.remove();
-            if (!ok) throw new Error("execCommand('copy') returned false");
-            return true;
-          } catch (e) {
-            console.error("Clipboard copy failed", e);
-            return false;
-          }
+          if (!text) return;
+          try { await navigator.clipboard.writeText(text); }
+          catch { alert("Copy failed"); }
         },
 
+        closeMenu(e) { e.currentTarget.closest("details")?.removeAttribute("open"); },
+
         async savePage() {
-          if (!this.page || !this.password) {
-            alert("Page and password must be set");
-            return;
-          }
-
-          if (!this.dirty) {
-            return;
-          }
-
+          if (!this.page || !this.password) return alert("Page and password required");
+          if (!this.dirty) return;
           if (this.lastSyncedPage && this.lastSyncedPage !== this.page) {
-            const ok = confirm(
-              `You're about to save to a different page than you last synced.\n\nLast: ${this.lastSyncedPage}\nNow:  ${this.page}\n\nContinue?`
-            );
-            if (!ok) return;
+            if (!confirm(`Save to different page?\n\nLast: ${this.lastSyncedPage}\nNow: ${this.page}`)) return;
           }
 
           this.busy = true;
-          await new Promise((r) => setTimeout(r, 10)); // mimic old busy behavior
-
-          let keyhashBytes, keyhashHex, passkeyBytes, passkeyHex;
           try {
-            if (
-              this.credentialsStored &&
-              localStorage.getItem("page") === this.page &&
-              this.keyhashBytes &&
-              this.passkeyBytes
-            ) {
-              keyhashBytes = this.keyhashBytes;
-              keyhashHex = this.keyhashHex;
-              passkeyBytes = this.passkeyBytes;
-              passkeyHex = this.passkeyHex;
-            } else {
-              ({
-                keyhashBytes,
-                keyhashHex,
-                passkeyBytes,
-                passkeyHex,
-              } = await this.calculateKeys(this.page, this.password));
-            }
-
+            const keys = await this.getKeys();
             const payload = JSON.stringify(this.entries);
-            const contenthash = await sha256Hex(payload);
-            const { iv, ciphertext } = await aesCtrEncrypt(
-              payload,
-              passkeyBytes
-            );
+            const hash = await sha256(payload);
+            const { iv, ct } = await aesEncrypt(payload, keys.pkB);
 
-            const content = {
-              iv: bytesToHex(iv),
-              deriv: "PBKDF2",
-              iter: PBKDF2_ITER,
-              hash: "SHA256",
-              salt: SALT_STRING,
-              crypto: "AES256CTR",
-              encrypted: bytesToBase64(ciphertext),
-            };
-
-            const body = new URLSearchParams({
-              keyhash: keyhashHex,
-              passhash: passkeyHex,
-              contenthash,
-              content: JSON.stringify(content),
-            }).toString();
+            const content = JSON.stringify({
+              iv: hex(iv), deriv: "PBKDF2", iter: ITER, hash: "SHA256",
+              salt: SALT, crypto: "AES256CTR", encrypted: b64(ct)
+            });
 
             const res = await fetch(this.apiBaseUrl + "/put.php", {
               method: "POST",
-              headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              body,
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({ keyhash: keys.kh, passhash: keys.pk, contenthash: hash, content })
             });
 
             if (!res.ok) {
               const text = await res.text().catch(() => "");
-              console.error("AJAX error:", res.status, text);
-              alert(
-                `Error saving page: ${res.status} ${res.statusText}\n${text}`
-              );
+              alert(`Error: ${res.status} ${res.statusText}\n${text}`);
             } else {
-              console.log("Page saved");
               this.loaded = true;
               this.dirty = false;
               this.lastSyncedPage = this.page;
-              alert("Page saved successfully");
+              alert("Saved");
             }
-          } catch (e) {
-            console.error("Save failed", e);
-            alert("Error saving page");
-          } finally {
-            this.busy = false;
-          }
+          } catch (e) { console.error(e); alert("Save failed"); }
+          finally { this.busy = false; }
         },
 
         async loadPage() {
-          if (!this.page || !this.password) {
-            alert("Page and password must be set");
-            return;
-          }
-
-          if (this.dirty) {
-            const ok = confirm(
-              "You have unsaved changes.\n\nReloading will discard your local changes.\n\nContinue?"
-            );
-            if (!ok) return;
-          }
+          if (!this.page || !this.password) return alert("Page and password required");
+          if (this.dirty && !confirm("Discard unsaved changes?")) return;
 
           this.busy = true;
-          await new Promise((r) => setTimeout(r, 10));
-
-          let keyhashBytes, keyhashHex, passkeyBytes;
           try {
-            if (
-              this.credentialsStored &&
-              localStorage.getItem("page") === this.page &&
-              this.keyhashBytes &&
-              this.passkeyBytes
-            ) {
-              keyhashBytes = this.keyhashBytes;
-              keyhashHex = this.keyhashHex;
-              passkeyBytes = this.passkeyBytes;
-            } else {
-              ({
-                keyhashBytes,
-                keyhashHex,
-                passkeyBytes,
-              } = await this.calculateKeys(this.page, this.password));
-            }
-
-            const res = await fetch(
-              this.apiBaseUrl + "/get.php?keyhash=" + keyhashHex
-            );
-            if (!res.ok) {
-              console.error("HTTP error " + res.status);
-              this.busy = false;
-              return;
-            }
+            const keys = await this.getKeys();
+            const res = await fetch(`${this.apiBaseUrl}/get.php?keyhash=${keys.kh}`);
+            if (!res.ok) return console.error("HTTP " + res.status);
 
             let { contenthash, content } = await res.json();
+            if (!contenthash || !content) return alert("No such page");
+            if (typeof content === "string") content = JSON.parse(content);
 
-            if (!contenthash || !content) {
-              alert("No such page");
-              console.error({ contenthash, content });
-              this.busy = false;
-              return;
+            const plain = await aesDecrypt(unb64(content.encrypted), keys.pkB, unhex(content.iv));
+            if (contenthash.toLowerCase() !== (await sha256(plain)).toLowerCase()) {
+              throw new Error("Hash mismatch");
             }
 
-            if (typeof content === "string") {
-              content = JSON.parse(content);
-            }
-
-            const ivBytes = hexToBytes(content.iv);
-            const ciphertextBytes = base64ToBytes(content.encrypted);
-
-            try {
-              const plaintext = await aesCtrDecrypt(
-                ciphertextBytes,
-                passkeyBytes,
-                ivBytes
-              );
-              const plainhash = await sha256Hex(plaintext);
-
-              if (contenthash.toLowerCase() !== plainhash.toLowerCase()) {
-                throw new Error(
-                  `Content hash mismatch: ${contenthash} != ${plainhash}`
-                );
-              }
-
-              this.entries = JSON.parse(plaintext);
-              this.filter = "";
-              this.loaded = true;
-              this.dirty = false;
-              this.lastSyncedPage = this.page;
-            } catch (e) {
-              console.error(e);
-              alert(
-                "Decryption failed. Please check your page and password."
-              );
-            }
-          } catch (e) {
-            console.error("Load failed", e);
-          } finally {
-            this.busy = false;
-          }
-        },
+            this.entries = JSON.parse(plain);
+            this.filter = "";
+            this.loaded = true;
+            this.dirty = false;
+            this.lastSyncedPage = this.page;
+          } catch (e) { console.error(e); alert("Decryption failed. Check page/password."); }
+          finally { this.busy = false; }
+        }
       };
     }
   </script>
 
-  <!-- Alpine.js (from CDN) -->
-  <script
-    src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
-    defer
-  ></script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
 
 <body x-data="cryptikiApp()" x-init="init()">
@@ -1068,329 +414,130 @@
           <h1>Cryptiki</h1>
           <div class="tagline">Client-side encrypted password store</div>
         </div>
-        <div
-          class="badge"
-          style="--badge-dot:#16a34a; --badge-ring: rgba(22, 163, 74, 0.12)"
-          title="API endpoint used by this page"
-        >
-          <span class="badge-dot" aria-hidden="true"></span>
-          <span x-text="apiBaseUrl ? apiBaseUrl : 'Same origin'"></span>
+        <div class="badge" style="--dot:#16a34a;--ring:rgba(22,163,74,.12)" title="API endpoint">
+          <span class="badge-dot"></span>
+          <span x-text="apiBaseUrl || 'Same origin'"></span>
         </div>
       </div>
 
-      <div class="panels">
-        <section class="panel" aria-label="Session and sync">
-          <div class="form-grid">
-            <label class="field">
-              <span>Page</span>
-              <input
-                id="page"
-                type="text"
-                inputmode="text"
-                autocomplete="off"
-                placeholder="e.g. personal"
-                x-model.trim="page"
-              />
-              <div class="help">Logical “file” name</div>
-            </label>
+      <section class="panel">
+        <div class="form-grid">
+          <label class="field">
+            <span>Page</span>
+            <input type="text" autocomplete="off" placeholder="e.g. personal" x-model.trim="page" />
+            <div class="help">Logical "file" name</div>
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <div class="input-row">
+              <input :type="showPass ? 'text' : 'password'" autocomplete="off" placeholder="Your master password" x-model="password" />
+              <button type="button" class="btn btn-ghost btn-mini" @click="showPass = !showPass" x-text="showPass ? 'Hide' : 'Show'"></button>
+            </div>
+            <div class="help">Used to derive encryption keys</div>
+          </label>
+        </div>
 
-            <label class="field">
-              <span>Password</span>
-              <div class="input-row">
-                <input
-                  id="password"
-                  :type="showPass ? 'text' : 'password'"
-                  x-model="password"
-                  autocomplete="off"
-                  placeholder="Your master password"
-                />
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-mini"
-                  @click="showPass = !showPass"
-                  :aria-pressed="showPass"
-                  x-text="showPass ? 'Hide' : 'Show'"
-                ></button>
+        <div class="flex flex-wrap gap-sm mt-md justify-between">
+          <div class="flex flex-wrap gap-sm flex-1">
+            <span class="badge" :style="statusStyle()">
+              <span class="badge-dot"></span>
+              <span x-text="statusLabel()"></span>
+            </span>
+            <span class="badge" x-show="credentialsStored" x-cloak style="--dot:#0ea5e9;--ring:rgba(14,165,233,.14)" title="Stored locally">
+              <span class="badge-dot"></span>
+              Cached credentials
+            </span>
+          </div>
+
+          <div class="flex flex-wrap gap-sm justify-end">
+            <button class="btn btn-ghost" :disabled="!sessionReady() || busy" :aria-busy="busy" @click="loadPage()" x-text="loaded ? 'Reload' : 'Load'"></button>
+            <button :class="dirty ? 'btn btn-primary' : 'btn btn-ghost'" :disabled="!sessionReady() || busy || !dirty" :aria-busy="busy" @click="savePage()" x-text="dirty ? (loaded ? 'Save changes' : 'Save new store') : (loaded ? 'Saved' : 'Save')"></button>
+            <details class="tools">
+              <summary class="btn btn-ghost">Tools &#9662;</summary>
+              <div class="menu">
+                <button class="btn btn-ghost" @click="showImport = true; closeMenu($event)">Import old format</button>
+                <button class="btn btn-ghost" @click="storeCredentials(); closeMenu($event)">Cache credentials</button>
+                <div class="menu-sep"></div>
+                <button class="btn btn-danger" x-show="credentialsStored" x-cloak @click="clearCredentials(); closeMenu($event)">Clear cached credentials</button>
+                <button class="btn btn-danger" x-show="entries.length" x-cloak @click="clearEntries(); closeMenu($event)">Clear all entries</button>
               </div>
-              <div class="help">Used to derive encryption keys</div>
-            </label>
+            </details>
           </div>
-
-          <div
-            class="toolbar-row"
-            style="margin-top: 0.75rem; align-items: flex-end; justify-content: space-between"
-          >
-            <div class="toolbar-row" style="flex: 1 1 auto; justify-content: flex-start">
-              <span
-                class="badge"
-                :style="statusBadgeStyle()"
-                title="Store status"
-              >
-                <span class="badge-dot" aria-hidden="true"></span>
-                <span x-text="statusLabel()"></span>
-              </span>
-              <span
-                class="badge"
-                x-show="credentialsStored"
-                x-cloak
-                style="--badge-dot:#0ea5e9; --badge-ring: rgba(14, 165, 233, 0.14)"
-                title="Stored in this browser only"
-              >
-                <span class="badge-dot" aria-hidden="true"></span>
-                Cached credentials
-              </span>
-            </div>
-
-            <div class="toolbar-row" style="justify-content: flex-end">
-              <button
-                type="button"
-                class="btn btn-ghost"
-                :disabled="!sessionReady() || busy"
-                :aria-busy="busy"
-                @click="loadPage()"
-                x-text="loaded ? 'Reload' : 'Load'"
-              ></button>
-
-              <button
-                type="button"
-                :class="dirty ? 'btn btn-primary' : 'btn btn-ghost'"
-                :disabled="!sessionReady() || busy || !dirty"
-                :aria-busy="busy"
-                @click="savePage()"
-                x-text="dirty ? (loaded ? 'Save changes' : 'Save new store') : (loaded ? 'Saved' : 'Save')"
-                :title="dirty ? 'Encrypt and save to server' : 'No changes to save'"
-              ></button>
-
-              <details class="tools" role="list">
-                <summary class="btn btn-ghost" role="button">Tools ▾</summary>
-                <div class="menu">
-                  <button
-                    type="button"
-                    class="btn btn-ghost"
-                    @click="showImport = true; $event.currentTarget.closest('details')?.removeAttribute('open')"
-                  >
-                    Import old format
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-ghost"
-                    @click="storeCredentials(); $event.currentTarget.closest('details')?.removeAttribute('open')"
-                  >
-                    Cache credentials
-                  </button>
-                  <div class="menu-sep"></div>
-                  <button
-                    type="button"
-                    class="btn btn-danger-ghost"
-                    @click="clearStoredCredentials(); $event.currentTarget.closest('details')?.removeAttribute('open')"
-                    x-show="credentialsStored"
-                    x-cloak
-                  >
-                    Clear cached credentials
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-danger-ghost"
-                    @click="clearAllEntries(); $event.currentTarget.closest('details')?.removeAttribute('open')"
-                    x-show="entries.length > 0"
-                    x-cloak
-                  >
-                    Clear all entries
-                  </button>
-                </div>
-              </details>
-            </div>
-          </div>
-
-          <div class="help">Encrypted locally; server never sees plaintext.</div>
-        </section>
-      </div>
+        </div>
+        <div class="help">Encrypted locally; server never sees plaintext.</div>
+      </section>
     </div>
   </header>
 
   <main>
     <div class="container">
-      <section class="content-header" aria-label="Entries toolbar">
-        <label class="field" style="flex: 1 1 auto">
+      <section class="content-header">
+        <label class="field flex-1">
           <span class="sr-only">Filter</span>
-          <input
-            id="filter"
-            type="search"
-            placeholder="Filter (use * to show all)"
-            x-model="filter"
-          />
+          <input type="search" placeholder="Filter (use * to show all)" x-model="filter" />
         </label>
-
         <div class="content-actions">
-          <button type="button" class="btn btn-ghost" @click="sortEntries()">
-            Sort A–Z
-          </button>
-          <button type="button" class="btn btn-primary" @click="addEntry()">
-            New entry
-          </button>
+          <button class="btn btn-ghost" @click="sortEntries()">Sort A-Z</button>
+          <button class="btn btn-primary" @click="addEntry()">New entry</button>
         </div>
       </section>
 
-      <!-- Import view -->
       <section class="card" x-show="showImport" x-cloak>
-        <h2 style="margin: 0 0 0.5rem; font-size: 1.05rem">Import</h2>
-        <div class="help" style="margin-bottom: 0.6rem">
-          Paste old Cryptiki entries (one per line) and import them into the current page.
-        </div>
-        <textarea
-          x-model="importText"
-          rows="8"
-          placeholder="example.com: user / password"
-        ></textarea>
-        <div class="toolbar-row" style="margin-top: 0.6rem; justify-content: flex-end">
-          <button type="button" class="btn btn-primary" @click="importEntries()">Import</button>
-          <button
-            type="button"
-            class="btn btn-ghost"
-            @click="showImport = false; importText = ''"
-          >
-            Cancel
-          </button>
+        <h2 style="margin:0 0 .5rem;font-size:1.05rem">Import</h2>
+        <div class="help" style="margin-bottom:.6rem">Paste old Cryptiki entries and import them.</div>
+        <textarea x-model="importText" rows="8" placeholder="example.com: user / password"></textarea>
+        <div class="flex gap-sm mt-sm justify-end">
+          <button class="btn btn-primary" @click="importEntries()">Import</button>
+          <button class="btn btn-ghost" @click="showImport = false; importText = ''">Cancel</button>
         </div>
       </section>
 
-      <!-- Empty state -->
-      <section class="card" x-show="!showImport && entries.length === 0" x-cloak>
-        <h2 style="margin: 0 0 0.35rem; font-size: 1.15rem">No entries yet</h2>
-        <div class="help">Create one with “New entry”, then Save to sync it.</div>
+      <section class="card" x-show="!showImport && !entries.length" x-cloak>
+        <h2 style="margin:0 0 .35rem;font-size:1.15rem">No entries yet</h2>
+        <div class="help">Create one with "New entry", then Save to sync it.</div>
       </section>
 
-      <!-- Security notice when there are entries but filter is empty -->
-      <section class="card" x-show="!showImport && entries.length > 0 && !filter" x-cloak>
-        <h2 style="margin: 0 0 0.35rem; font-size: 1.05rem">Passwords hidden</h2>
-        <div class="help" style="margin-bottom: 0.6rem">
-          For shoulder-surfing safety, passwords stay masked until you filter or show all.
-        </div>
-        <div class="toolbar-row">
-          <button type="button" class="btn btn-primary" @click="filter = '*'">Show all</button>
-        </div>
+      <section class="card" x-show="!showImport && entries.length && !filter" x-cloak>
+        <h2 style="margin:0 0 .35rem;font-size:1.05rem">Passwords hidden</h2>
+        <div class="help" style="margin-bottom:.6rem">Filter or show all to reveal.</div>
+        <button class="btn btn-primary" @click="filter = '*'">Show all</button>
       </section>
 
-      <!-- Entries list -->
-      <section class="entries" x-show="!showImport && entries.length > 0 && filter" x-cloak>
-        <template x-for="(entry, index) in entries" :key="index">
-          <article
-            class="entry-card"
-            x-data="{ showPassword: false, noteOpen: false }"
-            x-show="filter === '*' || caselessMatch(filter, entry.service, entry.username, entry.text)"
-          >
+      <section class="entries" x-show="!showImport && entries.length && filter" x-cloak>
+        <template x-for="(entry, i) in entries" :key="i">
+          <article class="entry-card" x-data="{ showPw: false, noteOpen: false }" x-show="filter === '*' || match(filter, entry.service, entry.username, entry.text)">
             <div class="entry-top">
               <div class="site">
                 <input type="text" x-model="entry.service" @input="markDirty()" placeholder="Site" />
               </div>
-
               <div class="input-row">
-                <input
-                  type="text"
-                  x-model="entry.username"
-                  @input="markDirty()"
-                  placeholder="Username"
-                />
-	                <button
-	                  type="button"
-	                  class="btn btn-ghost btn-mini btn-icon"
-	                  @click="copy(entry.username)"
-	                  title="Copy username"
-	                  aria-label="Copy username"
-	                >
-	                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-	                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
-	                    <rect x="2" y="2" width="13" height="13" rx="2"></rect>
-	                  </svg>
-	                  <span class="sr-only">Copy username</span>
-	                </button>
+                <input type="text" x-model="entry.username" @input="markDirty()" placeholder="Username" />
+                <button class="btn btn-ghost btn-mini btn-icon" @click="copy(entry.username)" title="Copy username">
+                  <svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><rect x="2" y="2" width="13" height="13" rx="2"/></svg>
+                </button>
               </div>
-
               <div class="input-row">
-                <input
-                  :type="showPassword ? 'text' : 'password'"
-                  x-model="entry.password"
-                  @input="markDirty()"
-                  placeholder="Password"
-                />
-	                <button
-	                  type="button"
-	                  class="btn btn-ghost btn-mini btn-icon"
-	                  @click="copy(entry.password)"
-	                  title="Copy password"
-	                  aria-label="Copy password"
-	                >
-	                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-	                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
-	                    <rect x="2" y="2" width="13" height="13" rx="2"></rect>
-	                  </svg>
-	                  <span class="sr-only">Copy password</span>
-	                </button>
-	                <button
-	                  type="button"
-	                  class="btn btn-ghost btn-mini btn-icon"
-	                  @click="showPassword = !showPassword"
-	                  :aria-pressed="showPassword"
-	                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
-	                  :title="showPassword ? 'Hide password' : 'Show password'"
-	                >
-	                  <svg x-show="!showPassword" x-cloak class="icon" viewBox="0 0 24 24" aria-hidden="true">
-	                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"></path>
-	                    <circle cx="12" cy="12" r="3"></circle>
-	                  </svg>
-	                  <svg x-show="showPassword" x-cloak class="icon" viewBox="0 0 24 24" aria-hidden="true">
-	                    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.75 21.75 0 0 1 5.06-6.94"></path>
-	                    <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.76 21.76 0 0 1-3.17 4.53"></path>
-	                    <path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"></path>
-	                    <path d="M1 1l22 22"></path>
-	                  </svg>
-	                  <span class="sr-only" x-text="showPassword ? 'Hide password' : 'Show password'"></span>
-	                </button>
-	              </div>
-
-	              <div class="toolbar-row" style="justify-content: flex-end">
-	                <button
-	                  type="button"
-	                  class="btn btn-ghost btn-mini btn-icon btn-note"
-	                  @click="noteOpen = !noteOpen"
-	                  :aria-pressed="noteOpen"
-	                  :aria-label="noteOpen ? 'Hide note' : 'Show note'"
-	                  :title="noteOpen ? 'Hide note' : 'Show note'"
-	                >
-	                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-	                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-	                    <path d="M14 2v6h6"></path>
-	                    <path d="M8 13h8"></path>
-	                    <path d="M8 17h8"></path>
-	                  </svg>
-	                  <span class="sr-only" x-text="noteOpen ? 'Hide note' : 'Show note'"></span>
-	                  <span
-	                    x-show="entry.text && entry.text.length"
-	                    class="note-dot"
-	                    aria-hidden="true"
-	                  ></span>
-	                </button>
-	                <button
-	                  type="button"
-	                  class="btn btn-danger-ghost btn-mini btn-icon"
-	                  title="Delete entry"
-	                  aria-label="Delete entry"
-	                  @click="deleteEntry(index)"
-	                >
-	                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-	                    <path d="M3 6h18"></path>
-	                    <path d="M8 6V4h8v2"></path>
-	                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-	                    <path d="M10 11v6"></path>
-	                    <path d="M14 11v6"></path>
-	                  </svg>
-	                  <span class="sr-only">Delete</span>
-	                </button>
-	              </div>
+                <input :type="showPw ? 'text' : 'password'" x-model="entry.password" @input="markDirty()" placeholder="Password" />
+                <button class="btn btn-ghost btn-mini btn-icon" @click="copy(entry.password)" title="Copy password">
+                  <svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><rect x="2" y="2" width="13" height="13" rx="2"/></svg>
+                </button>
+                <button class="btn btn-ghost btn-mini btn-icon" @click="showPw = !showPw" :title="showPw ? 'Hide' : 'Show'">
+                  <svg x-show="!showPw" class="icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg x-show="showPw" x-cloak class="icon" viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.75 21.75 0 0 1 5.06-6.94"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.76 21.76 0 0 1-3.17 4.53"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+                </button>
+              </div>
+              <div class="flex gap-sm justify-end">
+                <button class="btn btn-ghost btn-mini btn-icon btn-note" @click="noteOpen = !noteOpen" :title="noteOpen ? 'Hide note' : 'Show note'">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>
+                  <span x-show="entry.text" class="note-dot"></span>
+                </button>
+                <button class="btn btn-danger btn-mini btn-icon" @click="deleteEntry(i)" title="Delete">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                </button>
+              </div>
             </div>
-
-            <div x-show="noteOpen" x-cloak style="margin-top: 0.5rem">
-              <textarea x-model="entry.text" @input="markDirty()" rows="2" placeholder="Secure note…"></textarea>
+            <div x-show="noteOpen" x-cloak class="mt-sm">
+              <textarea x-model="entry.text" @input="markDirty()" rows="2" placeholder="Secure note..."></textarea>
             </div>
           </article>
         </template>
@@ -1399,9 +546,7 @@
   </main>
 
   <footer>
-    <div class="container">
-      &copy; Joonas Pihlajamaa. All rights reserved.
-    </div>
+    <div class="container">&copy; Joonas Pihlajamaa. All rights reserved.</div>
   </footer>
 </body>
 </html>
