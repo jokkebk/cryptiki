@@ -70,16 +70,13 @@
     }
 
     .app-header {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      background: rgba(246, 247, 251, 0.86);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+      position: static;
+      background: var(--bg);
+      border-bottom: 1px solid rgba(226, 232, 240, 0.85);
     }
 
     .header-inner {
-      padding: 1rem 0;
+      padding: 0.85rem 0;
       display: grid;
       grid-template-columns: 1fr;
       gap: 0.75rem;
@@ -140,8 +137,8 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 0.9rem;
+      box-shadow: none;
+      padding: 0.75rem;
     }
 
     .panel-title {
@@ -186,7 +183,7 @@
     input,
     textarea {
       width: 100%;
-      padding: 0.65rem 0.75rem;
+      padding: 0.55rem 0.65rem;
       border: 1px solid var(--border);
       border-radius: 12px;
       background: #fff;
@@ -212,7 +209,7 @@
       background: var(--surface-muted);
       color: var(--text);
       border-radius: 12px;
-      padding: 0.65rem 0.8rem;
+      padding: 0.55rem 0.7rem;
       font-weight: 650;
       font-size: 0.95rem;
       cursor: pointer;
@@ -258,7 +255,7 @@
     }
 
     .btn-mini {
-      padding: 0.5rem 0.6rem;
+      padding: 0.4rem 0.55rem;
       border-radius: var(--radius-sm);
       font-size: 0.9rem;
     }
@@ -346,7 +343,7 @@
 	    }
 
     main {
-      padding: 1rem 0 2rem;
+      padding: 0.85rem 0 2rem;
     }
 
     .content-header {
@@ -365,43 +362,47 @@
     }
 
     .entries {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.75rem;
-    }
-
-    .entry-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 0.9rem;
+      overflow: hidden;
+    }
+
+    .entry-card {
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      box-shadow: none;
+      padding: 0.65rem;
     }
 
     .entry-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.55rem;
     }
 
     .entry-top .site {
-      flex: 1 1 auto;
       min-width: 0;
     }
 
     .entry-grid {
-      margin-top: 0.75rem;
+      margin-top: 0.55rem;
       display: grid;
       grid-template-columns: 1fr;
-      gap: 0.75rem;
+      gap: 0.55rem;
     }
 
     .note-toggle {
-      margin-top: 0.5rem;
+      margin-top: 0.45rem;
       display: flex;
       align-items: center;
       gap: 0.5rem;
+    }
+
+    .entries > .entry-card:last-child {
+      border-bottom: 0;
     }
 
     .note-dot {
@@ -436,8 +437,14 @@
         justify-content: space-between;
       }
 
+      .entry-top {
+        grid-template-columns: 1.3fr 1fr 1.2fr auto;
+        align-items: center;
+        column-gap: 0.6rem;
+      }
+
       .entry-grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -779,11 +786,40 @@
         },
 
         async copy(text) {
-          if (!text) return;
+          if (!text) return false;
+
           try {
-            await navigator.clipboard.writeText(text);
+            if (
+              typeof navigator !== "undefined" &&
+              navigator.clipboard &&
+              typeof navigator.clipboard.writeText === "function" &&
+              (window.isSecureContext ?? false)
+            ) {
+              await navigator.clipboard.writeText(text);
+              return true;
+            }
+          } catch (e) {
+            console.warn("Clipboard API copy failed, falling back", e);
+          }
+
+          try {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.top = "-1000px";
+            textarea.style.left = "-1000px";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            textarea.setSelectionRange(0, textarea.value.length);
+            const ok = document.execCommand("copy");
+            textarea.remove();
+            if (!ok) throw new Error("execCommand('copy') returned false");
+            return true;
           } catch (e) {
             console.error("Clipboard copy failed", e);
+            return false;
           }
         },
 
@@ -1003,7 +1039,6 @@
 
       <div class="panels">
         <section class="panel" aria-label="Session and sync">
-          <h2 class="panel-title">Store</h2>
           <div class="form-grid">
             <label class="field">
               <span>Page</span>
@@ -1205,91 +1240,73 @@
           >
             <div class="entry-top">
               <div class="site">
+                <input type="text" x-model="entry.service" @input="markDirty()" placeholder="Site" />
+              </div>
+
+              <div class="input-row">
                 <input
                   type="text"
-                  x-model="entry.service"
+                  x-model="entry.username"
                   @input="markDirty()"
-                  placeholder="Site"
+                  placeholder="Username"
                 />
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-mini"
+                  @click="copy(entry.username)"
+                  title="Copy username"
+                >
+                  Copy
+                </button>
               </div>
-              <button
-                type="button"
-                class="btn btn-danger-ghost btn-mini"
-                title="Delete entry"
-                @click="$root.deleteEntry(index)"
-              >
-                Delete
-              </button>
-            </div>
 
-            <div class="entry-grid">
-              <label class="field">
-                <span>Username</span>
-                <div class="input-row">
-                  <input
-                    type="text"
-                    x-model="entry.username"
-                    @input="markDirty()"
-                    placeholder="Username"
-                  />
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-mini"
-                    @click="$root.copy(entry.username)"
-                    title="Copy username"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </label>
+              <div class="input-row">
+                <input
+                  :type="showPassword ? 'text' : 'password'"
+                  x-model="entry.password"
+                  @input="markDirty()"
+                  placeholder="Password"
+                />
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-mini"
+                  @click="copy(entry.password)"
+                  title="Copy password"
+                >
+                  Copy
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-mini"
+                  @click="showPassword = !showPassword"
+                  :aria-pressed="showPassword"
+                  x-text="showPassword ? 'Hide' : 'Show'"
+                  :title="showPassword ? 'Hide password' : 'Show password'"
+                ></button>
+              </div>
 
-              <label class="field">
-                <span>Password</span>
-                <div class="input-row">
-                  <input
-                    :type="showPassword ? 'text' : 'password'"
-                    x-model="entry.password"
-                    @input="markDirty()"
-                    placeholder="Password"
-                  />
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-mini"
-                    @click="$root.copy(entry.password)"
-                    title="Copy password"
-                  >
-                    Copy
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-mini"
-                    @click="showPassword = !showPassword"
-                    :aria-pressed="showPassword"
-                    x-text="showPassword ? 'Hide' : 'Show'"
-                    :title="showPassword ? 'Hide password' : 'Show password'"
-                  ></button>
-                </div>
-              </label>
-            </div>
-
-            <div class="note-toggle">
-              <button type="button" class="btn btn-ghost btn-mini" @click="noteOpen = !noteOpen">
-                <span x-text="noteOpen ? 'Hide note' : 'Note'"></span>
-                <span
-                  x-show="entry.text && entry.text.length"
-                  class="note-dot"
-                  aria-hidden="true"
-                ></span>
-              </button>
+              <div class="toolbar-row" style="justify-content: flex-end">
+                <button type="button" class="btn btn-ghost btn-mini" @click="noteOpen = !noteOpen">
+                  <span x-text="noteOpen ? 'Hide note' : 'Note'"></span>
+                  <span
+                    x-show="entry.text && entry.text.length"
+                    class="note-dot"
+                    aria-hidden="true"
+                  ></span>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger-ghost btn-mini"
+                  title="Delete entry"
+                  @click="$root.deleteEntry(index)"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
 
             <div x-show="noteOpen" x-cloak style="margin-top: 0.5rem">
-              <textarea
-                x-model="entry.text"
-                @input="markDirty()"
-                rows="2"
-                placeholder="Secure note…"
-              ></textarea>
+              <textarea x-model="entry.text" @input="markDirty()" rows="2" placeholder="Secure note…"></textarea>
             </div>
           </article>
         </template>
