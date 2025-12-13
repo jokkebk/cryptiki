@@ -5,151 +5,439 @@
   <title>Cryptiki Password Manager</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Pico CSS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/@picocss/pico@2.0.6/css/pico.min.css"
-  />
-
-  <!-- Icon library (no hardcoded SVGs) -->
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
-    crossorigin="anonymous"
-    referrerpolicy="no-referrer"
-  />
-
   <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7fb;
+      --surface: #ffffff;
+      --surface-muted: #f1f5f9;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 1px 2px rgba(15, 23, 42, 0.06),
+        0 8px 24px rgba(15, 23, 42, 0.08);
+      --radius: 14px;
+      --radius-sm: 10px;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --focus: 0 0 0 4px rgba(37, 99, 235, 0.18);
+      --max: 1100px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
+      margin: 0;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+        Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      line-height: 1.45;
     }
 
-    header.container {
-      margin-top: 1rem;
-      margin-bottom: 0.5rem;
+    a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
     }
 
-    header .grid {
-      align-items: flex-end;
+    .container {
+      width: min(var(--max), calc(100% - 2rem));
+      margin-inline: auto;
+    }
+
+    [x-cloak] {
+      display: none !important;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(246, 247, 251, 0.86);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+    }
+
+    .header-inner {
+      padding: 1rem 0;
+      display: grid;
+      grid-template-columns: 1fr;
       gap: 0.75rem;
     }
 
-    header label {
-      font-size: 0.9rem;
-      margin-bottom: 0;
-    }
-
-    header small {
-      font-size: 0.75rem;
-      opacity: 0.8;
-    }
-
-    main.container {
-      flex: 1 0 auto;
-      padding-top: 0.5rem;
-      padding-bottom: 1.5rem;
-    }
-
-    footer.container {
-      flex-shrink: 0;
-      padding-top: 0.5rem;
-      padding-bottom: 1rem;
-      font-size: 0.8rem;
-      text-align: center;
-      opacity: 0.7;
-    }
-
-    .actions-row {
-      margin: 0.5rem 0 1rem;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .actions-row > *:last-child {
-      justify-self: flex-end;
-      text-align: right;
-    }
-
-    .button-group {
+    .brand {
       display: flex;
-      gap: 0.4rem;
-      justify-content: flex-end;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
       flex-wrap: wrap;
     }
 
-    .button-group button {
-      white-space: nowrap;
+    .brand h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      letter-spacing: 0.2px;
     }
 
-    .icon-button {
-      padding: 0.35rem 0.5rem;
-      border-radius: 999px;
+    .tagline {
+      margin-top: 0.15rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .badge {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.6rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 999px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      white-space: nowrap;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+	    .badge-dot {
+	      width: 0.55rem;
+	      height: 0.55rem;
+	      border-radius: 999px;
+	      background: var(--badge-dot, #94a3b8);
+	      box-shadow: 0 0 0 3px var(--badge-ring, rgba(148, 163, 184, 0.18));
+	    }
+
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+
+    .panel,
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 0.9rem;
+    }
+
+    .panel-title {
+      margin: 0 0 0.6rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.7rem;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
       min-width: 0;
     }
 
-    .icon-button i {
+    .field > span {
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+
+    .help {
+      margin-top: 0.2rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    input:focus,
+    textarea:focus,
+    summary:focus {
+      outline: none;
+      border-color: rgba(37, 99, 235, 0.55);
+      box-shadow: var(--focus);
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface-muted);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 0.65rem 0.8rem;
+      font-weight: 650;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .btn:hover {
+      background: #e8eefc;
+      border-color: #cbd5e1;
+    }
+
+	    .btn:active {
+	      transform: translateY(1px);
+	    }
+
+	    .btn:disabled {
+	      opacity: 0.55;
+	      cursor: not-allowed;
+	      transform: none;
+	    }
+
+    .btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+    .btn-ghost {
+      background: transparent;
+    }
+    .btn-ghost:hover {
+      background: rgba(2, 6, 23, 0.05);
+      border-color: #cbd5e1;
+    }
+
+    .btn-mini {
+      padding: 0.5rem 0.6rem;
+      border-radius: var(--radius-sm);
       font-size: 0.9rem;
     }
 
-    .field-with-icons {
+    .btn-danger-ghost {
+      background: transparent;
+      border-color: rgba(220, 38, 38, 0.35);
+      color: var(--danger);
+    }
+    .btn-danger-ghost:hover {
+      background: rgba(220, 38, 38, 0.08);
+      border-color: rgba(220, 38, 38, 0.55);
+    }
+
+    button[aria-busy="true"] {
+      opacity: 0.78;
+      pointer-events: none;
+    }
+
+    button[aria-busy="true"]::after {
+      content: "";
+      width: 1em;
+      height: 1em;
+      margin-left: 0.55rem;
+      border-radius: 999px;
+      border: 2px solid rgba(15, 23, 42, 0.25);
+      border-top-color: rgba(15, 23, 42, 0.65);
+      animation: spin 0.7s linear infinite;
+    }
+
+    .btn-primary[aria-busy="true"]::after {
+      border-color: rgba(255, 255, 255, 0.55);
+      border-top-color: #fff;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    details.tools > summary {
+      list-style: none;
+    }
+
+	    details.tools > summary::-webkit-details-marker {
+	      display: none;
+	    }
+
+	    details.tools {
+	      position: relative;
+	    }
+
+	    .toolbar-row {
+	      display: flex;
+	      flex-wrap: wrap;
+	      gap: 0.5rem;
+	      align-items: center;
+	    }
+
+	    .menu {
+	      position: absolute;
+	      right: 0;
+	      top: calc(100% + 0.5rem);
+	      padding: 0.45rem;
+	      border: 1px solid var(--border);
+	      border-radius: var(--radius);
+	      background: var(--surface);
+	      box-shadow: var(--shadow);
+	      display: flex;
+	      flex-direction: column;
+	      gap: 0.4rem;
+	      min-width: 240px;
+	    }
+
+	    .menu .btn {
+	      width: 100%;
+	      justify-content: flex-start;
+	    }
+
+	    .menu-sep {
+	      height: 1px;
+	      background: var(--border);
+	      margin: 0.15rem 0;
+	    }
+
+    main {
+      padding: 1rem 0 2rem;
+    }
+
+    .content-header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .content-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .entries {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+
+    .entry-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 0.9rem;
+    }
+
+    .entry-top {
       display: flex;
       align-items: center;
-      gap: 0.25rem;
+      justify-content: space-between;
+      gap: 0.5rem;
     }
 
-    .field-with-icons input {
-      width: 100%;
+    .entry-top .site {
+      flex: 1 1 auto;
+      min-width: 0;
     }
 
-    table.compact th,
-    table.compact td {
-      vertical-align: top;
-    }
-
-    table.compact th {
-      white-space: nowrap;
-    }
-
-    td.actions {
-      text-align: right;
-      white-space: nowrap;
+    .entry-grid {
+      margin-top: 0.75rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
     }
 
     .note-toggle {
-      margin-top: 0.25rem;
-    }
-
-    .note-toggle textarea {
-      margin-top: 0.3rem;
-      width: 100%;
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     .note-dot {
       display: inline-block;
-      width: 0.45rem;
-      height: 0.45rem;
+      width: 0.55rem;
+      height: 0.55rem;
       border-radius: 999px;
-      background: currentColor;
-      margin-left: 0.3rem;
+      background: #f59e0b;
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
     }
 
-    details.tools > summary {
-      margin-top: 0.25rem;
+    footer {
+      padding: 1.5rem 0 2rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.86rem;
     }
 
-    @media (max-width: 768px) {
-      header .grid {
-        grid-template-columns: minmax(0, 1fr);
+    @media (min-width: 900px) {
+      .panels {
+        grid-template-columns: 1.25fr 1fr;
+        align-items: start;
       }
 
-      .actions-row {
-        grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+      .form-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .content-header {
+        flex-direction: row;
+        align-items: flex-end;
+        justify-content: space-between;
+      }
+
+      .entry-grid {
+        grid-template-columns: 1fr 1fr;
       }
     }
   </style>
@@ -157,7 +445,15 @@
   <script>
     // --- Crypto helpers (Web Crypto API) ---
 
-    const API_BASE_URL = window.API_BASE_URL || ""; // same as old VITE_API_BASE_URL default
+    // API base URL:
+    // - When served from a web origin, default to same-origin ("").
+    // - When opened locally (file://), default to https://cryptiki.com for easy testing.
+    const API_BASE_URL = (() => {
+      const explicit = (window.API_BASE_URL || "").trim();
+      const inferred = window.location.protocol === "file:" ? "https://cryptiki.com" : "";
+      const base = (explicit || inferred).trim();
+      return base.replace(/\/+$/, "");
+    })();
     const SALT_STRING = "Cryptiki 2.0";
     const PBKDF2_ITER = 133700;
     const KEY_LEN_BYTES = 32; // 256-bit
@@ -260,14 +556,18 @@
     function cryptikiApp() {
       return {
         // state
-        page: "lorem",
-        password: "ipsum",
+        apiBaseUrl: API_BASE_URL,
+        page: "",
+        password: "",
         showPass: false,
         filter: "",
         entries: [],
         importText: "",
         showImport: false,
         busy: false,
+        loaded: false,
+        dirty: false,
+        lastSyncedPage: null,
 
         keyhashHex: null,
         passkeyHex: null,
@@ -296,6 +596,38 @@
           } catch (e) {
             console.error("Failed to load stored credentials", e);
           }
+        },
+
+        sessionReady() {
+          return !!(this.page && this.password);
+        },
+
+        markDirty() {
+          this.dirty = true;
+        },
+
+        statusLabel() {
+          if (!this.sessionReady()) return "Enter page & password";
+          if (this.busy) return "Working…";
+          if (this.dirty) return "Unsaved changes";
+          if (this.loaded) return "Saved";
+          return "Not loaded";
+        },
+
+        statusBadgeStyle() {
+          if (!this.sessionReady()) {
+            return "--badge-dot:#94a3b8; --badge-ring: rgba(148, 163, 184, 0.18)";
+          }
+          if (this.busy) {
+            return "--badge-dot:#0ea5e9; --badge-ring: rgba(14, 165, 233, 0.14)";
+          }
+          if (this.dirty) {
+            return "--badge-dot:#f59e0b; --badge-ring: rgba(245, 158, 11, 0.14)";
+          }
+          if (this.loaded) {
+            return "--badge-dot:#16a34a; --badge-ring: rgba(22, 163, 74, 0.12)";
+          }
+          return "--badge-dot:#94a3b8; --badge-ring: rgba(148, 163, 184, 0.18)";
         },
 
         caselessMatch(needle, ...haystack) {
@@ -365,6 +697,20 @@
           alert("Stored credentials have been cleared");
         },
 
+        clearAllEntries() {
+          if (!this.entries.length) return;
+          if (
+            !confirm(
+              "Clear all entries from the current view?\n\nThis only changes your local state until you save."
+            )
+          ) {
+            return;
+          }
+          this.entries = [];
+          this.filter = "";
+          this.markDirty();
+        },
+
         addEntry() {
           const service = prompt("Site");
           if (service === null) return;
@@ -380,16 +726,19 @@
             text: "",
           });
           this.filter = service;
+          this.markDirty();
         },
 
         sortEntries() {
           this.entries.sort((a, b) =>
             (a.service || "").localeCompare(b.service || "")
           );
+          this.markDirty();
         },
 
         deleteEntry(index) {
           this.entries.splice(index, 1);
+          this.markDirty();
         },
 
         importEntries() {
@@ -426,6 +775,7 @@
           this.sortEntries();
           this.showImport = false;
           this.importText = "";
+          this.markDirty();
         },
 
         async copy(text) {
@@ -441,6 +791,17 @@
           if (!this.page || !this.password) {
             alert("Page and password must be set");
             return;
+          }
+
+          if (!this.dirty) {
+            return;
+          }
+
+          if (this.lastSyncedPage && this.lastSyncedPage !== this.page) {
+            const ok = confirm(
+              `You're about to save to a different page than you last synced.\n\nLast: ${this.lastSyncedPage}\nNow:  ${this.page}\n\nContinue?`
+            );
+            if (!ok) return;
           }
 
           this.busy = true;
@@ -491,7 +852,7 @@
               content: JSON.stringify(content),
             }).toString();
 
-            const res = await fetch(API_BASE_URL + "/put.php", {
+            const res = await fetch(this.apiBaseUrl + "/put.php", {
               method: "POST",
               headers: {
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -507,6 +868,9 @@
               );
             } else {
               console.log("Page saved");
+              this.loaded = true;
+              this.dirty = false;
+              this.lastSyncedPage = this.page;
               alert("Page saved successfully");
             }
           } catch (e) {
@@ -521,6 +885,13 @@
           if (!this.page || !this.password) {
             alert("Page and password must be set");
             return;
+          }
+
+          if (this.dirty) {
+            const ok = confirm(
+              "You have unsaved changes.\n\nReloading will discard your local changes.\n\nContinue?"
+            );
+            if (!ok) return;
           }
 
           this.busy = true;
@@ -546,7 +917,7 @@
             }
 
             const res = await fetch(
-              API_BASE_URL + "/get.php?keyhash=" + keyhashHex
+              this.apiBaseUrl + "/get.php?keyhash=" + keyhashHex
             );
             if (!res.ok) {
               console.error("HTTP error " + res.status);
@@ -585,6 +956,10 @@
               }
 
               this.entries = JSON.parse(plaintext);
+              this.filter = "";
+              this.loaded = true;
+              this.dirty = false;
+              this.lastSyncedPage = this.page;
             } catch (e) {
               console.error(e);
               alert(
@@ -609,292 +984,323 @@
 </head>
 
 <body x-data="cryptikiApp()" x-init="init()">
-  <header class="container">
-    <div class="grid">
-      <div>
-        <label for="page">
-          Page
-          <input
-            id="page"
-            type="text"
-            inputmode="text"
-            autocomplete="off"
-            x-model.trim="page"
-          />
-          <small>Logical “file” name</small>
-        </label>
+  <header class="app-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <div>
+          <h1>Cryptiki</h1>
+          <div class="tagline">Client-side encrypted password store</div>
+        </div>
+        <div
+          class="badge"
+          style="--badge-dot:#16a34a; --badge-ring: rgba(22, 163, 74, 0.12)"
+          title="API endpoint used by this page"
+        >
+          <span class="badge-dot" aria-hidden="true"></span>
+          <span x-text="apiBaseUrl ? apiBaseUrl : 'Same origin'"></span>
+        </div>
       </div>
 
-      <div>
-        <label for="password">
-          Password
-          <div class="field-with-icons">
-            <input
-              id="password"
-              :type="showPass ? 'text' : 'password'"
-              x-model="password"
-              autocomplete="off"
-            />
-            <button
-              type="button"
-              class="secondary icon-button"
-              @click="showPass = !showPass"
-              :aria-pressed="showPass"
-              :title="showPass ? 'Hide password' : 'Show password'"
-            >
-              <i class="fa-regular" :class="showPass ? 'fa-eye-slash' : 'fa-eye'"></i>
-            </button>
+      <div class="panels">
+        <section class="panel" aria-label="Session and sync">
+          <h2 class="panel-title">Store</h2>
+          <div class="form-grid">
+            <label class="field">
+              <span>Page</span>
+              <input
+                id="page"
+                type="text"
+                inputmode="text"
+                autocomplete="off"
+                placeholder="e.g. personal"
+                x-model.trim="page"
+              />
+              <div class="help">Logical “file” name</div>
+            </label>
+
+            <label class="field">
+              <span>Password</span>
+              <div class="input-row">
+                <input
+                  id="password"
+                  :type="showPass ? 'text' : 'password'"
+                  x-model="password"
+                  autocomplete="off"
+                  placeholder="Your master password"
+                />
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-mini"
+                  @click="showPass = !showPass"
+                  :aria-pressed="showPass"
+                  x-text="showPass ? 'Hide' : 'Show'"
+                ></button>
+              </div>
+              <div class="help">Used to derive encryption keys</div>
+            </label>
           </div>
-          <small>Used to derive encryption keys</small>
-        </label>
-      </div>
 
-      <div>
-        <label>
-          Actions
-          <button
-            type="button"
-            :aria-busy="busy"
-            @click="entries.length ? savePage() : loadPage()"
+          <div
+            class="toolbar-row"
+            style="margin-top: 0.75rem; align-items: flex-end; justify-content: space-between"
           >
-            <i
-              class="fa-solid"
-              :class="entries.length ? 'fa-floppy-disk' : 'fa-cloud-arrow-down'"
-            ></i>
-            <span x-text="entries.length ? 'Save' : 'Load'"></span>
-          </button>
-          <small x-show="entries.length === 0"
-            >Load existing store</small
-          >
-          <small x-show="entries.length > 0">Save current store</small>
-        </label>
-      </div>
+            <div class="toolbar-row" style="flex: 1 1 auto; justify-content: flex-start">
+              <span
+                class="badge"
+                :style="statusBadgeStyle()"
+                title="Store status"
+              >
+                <span class="badge-dot" aria-hidden="true"></span>
+                <span x-text="statusLabel()"></span>
+              </span>
+              <span
+                class="badge"
+                x-show="credentialsStored"
+                x-cloak
+                style="--badge-dot:#0ea5e9; --badge-ring: rgba(14, 165, 233, 0.14)"
+                title="Stored in this browser only"
+              >
+                <span class="badge-dot" aria-hidden="true"></span>
+                Cached credentials
+              </span>
+            </div>
 
-      <div>
-        <label>
-          Tools
-          <details class="tools" role="list">
-            <summary class="secondary" role="button">Tools</summary>
-            <ul>
-              <li>
-                <button
-                  type="button"
-                  class="secondary"
-                  @click="storeCredentials()"
-                >
-                  <i class="fa-solid fa-key"></i>
-                  Cache credentials
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="secondary"
-                  @click="showImport = true"
-                >
-                  <i class="fa-solid fa-file-import"></i>
-                  Import old format
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="secondary"
-                  @click="clearStoredCredentials()"
-                  x-show="credentialsStored"
-                >
-                  <i class="fa-solid fa-eraser"></i>
-                  Clear cached credentials
-                </button>
-              </li>
-            </ul>
-          </details>
-        </label>
+            <div class="toolbar-row" style="justify-content: flex-end">
+              <button
+                type="button"
+                class="btn btn-ghost"
+                :disabled="!sessionReady() || busy"
+                :aria-busy="busy"
+                @click="loadPage()"
+                x-text="loaded ? 'Reload' : 'Load'"
+              ></button>
+
+              <button
+                type="button"
+                :class="dirty ? 'btn btn-primary' : 'btn btn-ghost'"
+                :disabled="!sessionReady() || busy || !dirty"
+                :aria-busy="busy"
+                @click="savePage()"
+                x-text="dirty ? (loaded ? 'Save changes' : 'Save new store') : (loaded ? 'Saved' : 'Save')"
+                :title="dirty ? 'Encrypt and save to server' : 'No changes to save'"
+              ></button>
+
+              <details class="tools" role="list">
+                <summary class="btn btn-ghost" role="button">Tools ▾</summary>
+                <div class="menu">
+                  <button
+                    type="button"
+                    class="btn btn-ghost"
+                    @click="showImport = true; $event.currentTarget.closest('details')?.removeAttribute('open')"
+                  >
+                    Import old format
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost"
+                    @click="storeCredentials(); $event.currentTarget.closest('details')?.removeAttribute('open')"
+                  >
+                    Cache credentials
+                  </button>
+                  <div class="menu-sep"></div>
+                  <button
+                    type="button"
+                    class="btn btn-danger-ghost"
+                    @click="clearStoredCredentials(); $event.currentTarget.closest('details')?.removeAttribute('open')"
+                    x-show="credentialsStored"
+                    x-cloak
+                  >
+                    Clear cached credentials
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-danger-ghost"
+                    @click="clearAllEntries(); $event.currentTarget.closest('details')?.removeAttribute('open')"
+                    x-show="entries.length > 0"
+                    x-cloak
+                  >
+                    Clear all entries
+                  </button>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <div class="help">Encrypted locally; server never sees plaintext.</div>
+        </section>
       </div>
     </div>
   </header>
 
-  <main class="container">
-    <div class="grid actions-row">
-      <div>
-        <label for="filter" style="margin-bottom: 0">
+  <main>
+    <div class="container">
+      <section class="content-header" aria-label="Entries toolbar">
+        <label class="field" style="flex: 1 1 auto">
           <span class="sr-only">Filter</span>
           <input
             id="filter"
             type="search"
-            placeholder="Filter (* for all)"
+            placeholder="Filter (use * to show all)"
             x-model="filter"
           />
         </label>
-      </div>
-      <div class="button-group">
-        <button type="button" class="secondary" @click="sortEntries()">
-          <i class="fa-solid fa-arrow-down-a-z"></i>
-          Sort
-        </button>
-        <button type="button" @click="addEntry()">
-          <i class="fa-solid fa-plus"></i>
-          New entry
-        </button>
-      </div>
-    </div>
 
-    <!-- Import view -->
-    <section x-show="showImport" x-cloak>
-      <textarea
-        x-model="importText"
-        rows="8"
-        placeholder="Paste old Cryptiki passwords here"
-      ></textarea>
-      <div class="button-group" style="margin-top: 0.5rem">
-        <button type="button" @click="importEntries()">Import</button>
-        <button
-          type="button"
-          class="secondary"
-          @click="showImport = false; importText = ''"
-        >
-          Cancel
-        </button>
-      </div>
-    </section>
+        <div class="content-actions">
+          <button type="button" class="btn btn-ghost" @click="sortEntries()">
+            Sort A–Z
+          </button>
+          <button type="button" class="btn btn-primary" @click="addEntry()">
+            New entry
+          </button>
+        </div>
+      </section>
 
-    <!-- Empty state -->
-    <section x-show="!showImport && entries.length === 0" x-cloak>
-      <h3>No entries yet.</h3>
-      <p>Add your first login with <strong>New entry</strong>.</p>
-    </section>
+      <!-- Import view -->
+      <section class="card" x-show="showImport" x-cloak>
+        <h2 style="margin: 0 0 0.5rem; font-size: 1.05rem">Import</h2>
+        <div class="help" style="margin-bottom: 0.6rem">
+          Paste old Cryptiki entries (one per line) and import them into the current page.
+        </div>
+        <textarea
+          x-model="importText"
+          rows="8"
+          placeholder="example.com: user / password"
+        ></textarea>
+        <div class="toolbar-row" style="margin-top: 0.6rem; justify-content: flex-end">
+          <button type="button" class="btn btn-primary" @click="importEntries()">Import</button>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            @click="showImport = false; importText = ''"
+          >
+            Cancel
+          </button>
+        </div>
+      </section>
 
-    <!-- Security notice when there are entries but filter is empty -->
-    <section
-      x-show="!showImport && entries.length > 0 && !filter"
-      x-cloak
-    >
-      <p>
-        For your security (e.g. someone looking over your shoulder), passwords
-        are hidden until you choose what to show.
-      </p>
-      <button
-        type="button"
-        class="contrast"
-        @click="filter = '*'"
-      >
-        Show all
-      </button>
-    </section>
+      <!-- Empty state -->
+      <section class="card" x-show="!showImport && entries.length === 0" x-cloak>
+        <h2 style="margin: 0 0 0.35rem; font-size: 1.15rem">No entries yet</h2>
+        <div class="help">Create one with “New entry”, then Save to sync it.</div>
+      </section>
 
-    <!-- Entries table -->
-    <section
-      x-show="!showImport && entries.length > 0 && filter"
-      x-cloak
-    >
-      <table class="compact">
-        <thead>
-          <tr>
-            <th>Site</th>
-            <th>Username</th>
-            <th style="min-width: 13rem">Password &amp; note</th>
-            <th>Operations</th>
-          </tr>
-        </thead>
-        <tbody>
-          <template x-for="(entry, index) in entries" :key="index">
-            <tr
-              x-data="{ showPassword: false, noteOpen: false }"
-              x-show="filter === '*' || caselessMatch(filter, entry.service, entry.username, entry.text)"
-            >
-              <td>
+      <!-- Security notice when there are entries but filter is empty -->
+      <section class="card" x-show="!showImport && entries.length > 0 && !filter" x-cloak>
+        <h2 style="margin: 0 0 0.35rem; font-size: 1.05rem">Passwords hidden</h2>
+        <div class="help" style="margin-bottom: 0.6rem">
+          For shoulder-surfing safety, passwords stay masked until you filter or show all.
+        </div>
+        <div class="toolbar-row">
+          <button type="button" class="btn btn-primary" @click="filter = '*'">Show all</button>
+        </div>
+      </section>
+
+      <!-- Entries list -->
+      <section class="entries" x-show="!showImport && entries.length > 0 && filter" x-cloak>
+        <template x-for="(entry, index) in entries" :key="index">
+          <article
+            class="entry-card"
+            x-data="{ showPassword: false, noteOpen: false }"
+            x-show="filter === '*' || caselessMatch(filter, entry.service, entry.username, entry.text)"
+          >
+            <div class="entry-top">
+              <div class="site">
                 <input
                   type="text"
                   x-model="entry.service"
+                  @input="markDirty()"
                   placeholder="Site"
                 />
-              </td>
-              <td>
-                <div class="field-with-icons">
+              </div>
+              <button
+                type="button"
+                class="btn btn-danger-ghost btn-mini"
+                title="Delete entry"
+                @click="$root.deleteEntry(index)"
+              >
+                Delete
+              </button>
+            </div>
+
+            <div class="entry-grid">
+              <label class="field">
+                <span>Username</span>
+                <div class="input-row">
                   <input
                     type="text"
                     x-model="entry.username"
+                    @input="markDirty()"
                     placeholder="Username"
                   />
                   <button
                     type="button"
-                    class="secondary icon-button"
+                    class="btn btn-ghost btn-mini"
                     @click="$root.copy(entry.username)"
                     title="Copy username"
                   >
-                    <i class="fa-regular fa-copy"></i>
+                    Copy
                   </button>
                 </div>
-              </td>
-              <td>
-                <div class="field-with-icons">
+              </label>
+
+              <label class="field">
+                <span>Password</span>
+                <div class="input-row">
                   <input
                     :type="showPassword ? 'text' : 'password'"
                     x-model="entry.password"
+                    @input="markDirty()"
                     placeholder="Password"
                   />
                   <button
                     type="button"
-                    class="secondary icon-button"
+                    class="btn btn-ghost btn-mini"
                     @click="$root.copy(entry.password)"
                     title="Copy password"
                   >
-                    <i class="fa-regular fa-copy"></i>
+                    Copy
                   </button>
                   <button
                     type="button"
-                    class="secondary icon-button"
+                    class="btn btn-ghost btn-mini"
                     @click="showPassword = !showPassword"
+                    :aria-pressed="showPassword"
+                    x-text="showPassword ? 'Hide' : 'Show'"
                     :title="showPassword ? 'Hide password' : 'Show password'"
-                  >
-                    <i
-                      class="fa-regular"
-                      :class="showPassword ? 'fa-eye-slash' : 'fa-eye'"
-                    ></i>
-                  </button>
+                  ></button>
                 </div>
-                <div class="note-toggle">
-                  <button
-                    type="button"
-                    class="secondary"
-                    @click="noteOpen = !noteOpen"
-                  >
-                    <i class="fa-regular fa-note-sticky"></i>
-                    <span x-text="noteOpen ? 'Hide note' : 'Note'"></span>
-                    <span
-                      x-show="entry.text && entry.text.length"
-                      class="note-dot"
-                      aria-hidden="true"
-                    ></span>
-                  </button>
-                  <textarea
-                    x-show="noteOpen"
-                    x-model="entry.text"
-                    rows="2"
-                    placeholder="Secure note…"
-                    x-cloak
-                  ></textarea>
-                </div>
-              </td>
-              <td class="actions">
-                <button
-                  type="button"
-                  class="secondary"
-                  title="Delete entry"
-                  @click="$root.deleteEntry(index)"
-                >
-                  <i class="fa-regular fa-trash-can"></i>
-                </button>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-    </section>
+              </label>
+            </div>
+
+            <div class="note-toggle">
+              <button type="button" class="btn btn-ghost btn-mini" @click="noteOpen = !noteOpen">
+                <span x-text="noteOpen ? 'Hide note' : 'Note'"></span>
+                <span
+                  x-show="entry.text && entry.text.length"
+                  class="note-dot"
+                  aria-hidden="true"
+                ></span>
+              </button>
+            </div>
+
+            <div x-show="noteOpen" x-cloak style="margin-top: 0.5rem">
+              <textarea
+                x-model="entry.text"
+                @input="markDirty()"
+                rows="2"
+                placeholder="Secure note…"
+              ></textarea>
+            </div>
+          </article>
+        </template>
+      </section>
+    </div>
   </main>
 
-  <footer class="container">
-    &copy; Joonas Pihlajamaa. All rights reserved.
+  <footer>
+    <div class="container">
+      &copy; Joonas Pihlajamaa. All rights reserved.
+    </div>
   </footer>
 </body>
 </html>
