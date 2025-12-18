@@ -334,6 +334,86 @@
 
         closeMenu(e) { e.currentTarget.closest("details")?.removeAttribute("open"); },
 
+        async exportEntries() {
+          if (!this.entries.length) return alert("No entries to export");
+          const exportPwd = prompt("Export password (can be empty):");
+          if (exportPwd === null) return;
+
+          try {
+            const payload = JSON.stringify(this.entries);
+            const salt = "Cryptiki Export 1.0";
+            const khB = await pbkdf2(enc.encode(salt), enc.encode(salt));
+            const pkB = await pbkdf2(enc.encode(exportPwd), khB);
+            const { iv, ct } = await aesEncrypt(payload, pkB);
+
+            const exportData = JSON.stringify({
+              iv: hex(iv), salt, iter: ITER, encrypted: b64(ct)
+            });
+
+            const html = this.generateExportHtml(exportData);
+            const blob = new Blob([html], { type: "text/html" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `cryptiki-export-${new Date().toISOString().slice(0, 10)}.html`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch (e) { console.error(e); alert("Export failed"); }
+        },
+
+        generateExportHtml(exportData) {
+          const scriptContent = `
+    const DATA = ${exportData};
+    const ITER = ${ITER};
+    const enc = new TextEncoder(), dec = new TextDecoder();
+    const hex = b => [...b].map(x => x.toString(16).padStart(2, "0")).join("");
+    const unhex = h => h ? new Uint8Array(h.match(/.{2}/g).map(x => parseInt(x, 16))) : new Uint8Array();
+    const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+    async function pbkdf2(pwd, salt) {
+      const key = await crypto.subtle.importKey("raw", pwd, "PBKDF2", false, ["deriveBits"]);
+      return new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", iterations: ITER, salt }, key, 256));
+    }
+
+    async function aesDecrypt(ct, key, iv) {
+      const k = await crypto.subtle.importKey("raw", key, { name: "AES-CTR", length: 256 }, false, ["decrypt"]);
+      return dec.decode(await crypto.subtle.decrypt({ name: "AES-CTR", counter: iv, length: 128 }, k, ct));
+    }
+
+    async function decrypt() {
+      const pwd = document.getElementById("pwd").value;
+      const err = document.getElementById("error");
+      err.classList.add("hidden");
+      try {
+        const khB = await pbkdf2(enc.encode(DATA.salt), enc.encode(DATA.salt));
+        const pkB = await pbkdf2(enc.encode(pwd), khB);
+        const plain = await aesDecrypt(unb64(DATA.encrypted), pkB, unhex(DATA.iv));
+        const entries = JSON.parse(plain);
+        render(entries);
+      } catch (e) { console.error(e); err.classList.remove("hidden"); }
+    }
+
+    function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+    function render(entries) {
+      document.getElementById("unlockPanel").classList.add("hidden");
+      const c = document.getElementById("content");
+      c.classList.remove("hidden");
+      if (!entries.length) { c.innerHTML = "<p>No entries.</p>"; return; }
+      var html = "<table><thead><tr><th>Site</th><th>Username</th><th>Password</th><th>Notes</th></tr></thead><tbody>";
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        html += "<tr><td>" + esc(e.service || "") + "</td><td>" + esc(e.username || "") + "</td><td>" + esc(e.password || "") + '</td><td class="note">' + esc(e.text || "") + "</td></tr>";
+      }
+      html += "</tbody></table>";
+      c.innerHTML = html;
+    }
+
+    document.getElementById("pwd").addEventListener("keydown", function(e) { if (e.key === "Enter") decrypt(); });
+`;
+          return '<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8"/>\n  <title>Cryptiki Export</title>\n  <meta name="viewport" content="width=device-width,initial-scale=1"/>\n  <style>\n    *{box-sizing:border-box}\n    body{margin:0;padding:2rem;font:1rem/1.5 system-ui,sans-serif;background:#f6f7fb;color:#0f172a}\n    .container{max-width:900px;margin:0 auto}\n    h1{margin:0 0 1rem;font-size:1.5rem}\n    .unlock{background:#fff;padding:1.5rem;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:1rem}\n    .field{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}\n    input{padding:.5rem .75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:1rem;flex:1;min-width:200px}\n    button{padding:.5rem 1rem;border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:8px;font-size:1rem;cursor:pointer}\n    button:hover{background:#1d4ed8}\n    table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0}\n    th,td{padding:.6rem .75rem;text-align:left;border-bottom:1px solid #e2e8f0;font-size:.9rem}\n    th{background:#f1f5f9;font-weight:600}\n    tr:last-child td{border-bottom:0}\n    td{word-break:break-word}\n    .note{color:#64748b;font-size:.85rem;white-space:pre-wrap}\n    .hidden{display:none}\n    .error{color:#dc2626;margin-top:.5rem}\n  </style>\n</head>\n<body>\n  <div class="container">\n    <h1>Cryptiki Export</h1>\n    <div class="unlock" id="unlockPanel">\n      <div class="field">\n        <input type="password" id="pwd" placeholder="Export password" autofocus/>\n        <button onclick="decrypt()">Unlock</button>\n      </div>\n      <div class="error hidden" id="error">Decryption failed. Check password.</div>\n    </div>\n    <div id="content" class="hidden"></div>\n  </div>\n  <script>' + scriptContent + '<\/script>\n</body>\n</html>';
+        },
+
         async savePage() {
           if (!this.page || !this.password) return alert("Page and password required");
           if (!this.dirty) return;
@@ -455,6 +535,7 @@
             <details class="tools">
               <summary class="btn btn-ghost">Tools &#9662;</summary>
               <div class="menu">
+                <button class="btn btn-ghost" @click="exportEntries(); closeMenu($event)">Export</button>
                 <button class="btn btn-ghost" @click="showImport = true; closeMenu($event)">Import old format</button>
                 <button class="btn btn-ghost" @click="storeCredentials(); closeMenu($event)">Cache credentials</button>
                 <div class="menu-sep"></div>
