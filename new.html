@@ -243,10 +243,21 @@
           return this.loaded ? styles.saved : styles.default;
         },
 
-        match(needle, ...hay) {
-          if (!needle) return true;
-          const n = needle.toUpperCase();
-          return hay.some(h => (h || "").toString().toUpperCase().includes(n));
+        getFilteredEntries() {
+          if (!this.filter) return [];
+          if (this.filter === "*") return this.entries;
+          const needle = this.filter.toUpperCase();
+          const score = e => {
+            const s = (e.service || "").toUpperCase();
+            if (s === needle) return 0;
+            if (s.startsWith(needle)) return 1;
+            if (s.includes(needle)) return 2;
+            if ((e.username || "").toUpperCase().includes(needle)) return 3;
+            if ((e.password || "").toUpperCase().includes(needle)) return 4;
+            if ((e.text || "").toUpperCase().includes(needle)) return 5;
+            return 6;
+          };
+          return this.entries.filter(e => score(e) < 6).sort((a, b) => score(a) - score(b));
         },
 
         async deriveKeys(page, pwd) {
@@ -306,7 +317,10 @@
           this.markDirty();
         },
 
-        deleteEntry(i) { this.entries.splice(i, 1); this.markDirty(); },
+        deleteEntry(entry) {
+          const i = this.entries.indexOf(entry);
+          if (i > -1) { this.entries.splice(i, 1); this.markDirty(); }
+        },
 
         importEntries() {
           const re = /^(\w.*):\s+(.+) \/ (.+)$/;
@@ -585,8 +599,8 @@
       </section>
 
       <section class="entries" x-show="!showImport && entries.length && filter" x-cloak>
-        <template x-for="(entry, i) in entries" :key="i">
-          <article class="entry-card" x-data="{ showPw: false, noteOpen: false }" x-show="filter === '*' || match(filter, entry.service, entry.username, entry.text)">
+        <template x-for="entry in getFilteredEntries()" :key="entries.indexOf(entry)">
+          <article class="entry-card" x-data="{ showPw: false, noteOpen: false }">
             <div class="entry-top">
               <div class="site">
                 <input type="text" x-model="entry.service" @input="markDirty()" placeholder="Site" />
@@ -612,7 +626,7 @@
                   <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>
                   <span x-show="entry.text" class="note-dot"></span>
                 </button>
-                <button class="btn btn-danger btn-mini btn-icon" @click="deleteEntry(i)" title="Delete">
+                <button class="btn btn-danger btn-mini btn-icon" @click="deleteEntry(entry)" title="Delete">
                   <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
                 </button>
               </div>
