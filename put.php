@@ -1,5 +1,6 @@
 <?php
 # AJAX handler to set content for a specific key
+header("Access-Control-Allow-Origin: *");
 
 if(!$_POST['keyhash'] || !$_POST['passhash'] || !$_POST['content']) {
   http_response_code(400); // Bad Request

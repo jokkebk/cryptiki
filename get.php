@@ -1,5 +1,6 @@
 <?php
 # AJAX handler to get content for a specific key
+header("Access-Control-Allow-Origin: *");
 
 if(!$_POST['keyhash'] && !$_GET['keyhash']) {
   http_response_code(400); // Bad Request
@@ -23,8 +24,6 @@ if(mysqli_num_rows($result) == 0) {
   list($contenthash, $content) = mysqli_fetch_row($result);
   mysqli_query($mysql, "UPDATE pages SET accessed = NOW() WHERE keyhash = '$keyhash'"); # note when accessed
 }
-
-header("Access-Control-Allow-Origin: *");
 
 if($_GET['raw'] == '1') {
   header('Content-type: text/plain');
