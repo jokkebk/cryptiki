@@ -428,16 +428,20 @@
           return '<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8"/>\n  <title>Cryptiki Export</title>\n  <meta name="viewport" content="width=device-width,initial-scale=1"/>\n  <style>\n    *{box-sizing:border-box}\n    body{margin:0;padding:2rem;font:1rem/1.5 system-ui,sans-serif;background:#f6f7fb;color:#0f172a}\n    .container{max-width:900px;margin:0 auto}\n    h1{margin:0 0 1rem;font-size:1.5rem}\n    .unlock{background:#fff;padding:1.5rem;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:1rem}\n    .field{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}\n    input{padding:.5rem .75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:1rem;flex:1;min-width:200px}\n    button{padding:.5rem 1rem;border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:8px;font-size:1rem;cursor:pointer}\n    button:hover{background:#1d4ed8}\n    table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0}\n    th,td{padding:.6rem .75rem;text-align:left;border-bottom:1px solid #e2e8f0;font-size:.9rem}\n    th{background:#f1f5f9;font-weight:600}\n    tr:last-child td{border-bottom:0}\n    td{word-break:break-word}\n    .note{color:#64748b;font-size:.85rem;white-space:pre-wrap}\n    .hidden{display:none}\n    .error{color:#dc2626;margin-top:.5rem}\n  </style>\n</head>\n<body>\n  <div class="container">\n    <h1>Cryptiki Export</h1>\n    <div class="unlock" id="unlockPanel">\n      <div class="field">\n        <input type="password" id="pwd" placeholder="Export password" autofocus/>\n        <button onclick="decrypt()">Unlock</button>\n      </div>\n      <div class="error hidden" id="error">Decryption failed. Check password.</div>\n    </div>\n    <div id="content" class="hidden"></div>\n  </div>\n  <script>' + scriptContent + '<\/script>\n</body>\n</html>';
         },
 
-        async savePage() {
+        async savePage(targetPage = null) {
           if (!this.page || !this.password) return alert("Page and password required");
-          if (!this.dirty) return;
-          if (this.lastSyncedPage && this.lastSyncedPage !== this.page) {
-            if (!confirm(`Save to different page?\n\nLast: ${this.lastSyncedPage}\nNow: ${this.page}`)) return;
+          const isSaveAs = targetPage !== null;
+
+          if (!isSaveAs) {
+            if (!this.dirty) return;
+            if (this.lastSyncedPage && this.lastSyncedPage !== this.page) {
+              if (!confirm(`Save to different page?\n\nLast: ${this.lastSyncedPage}\nNow: ${this.page}`)) return;
+            }
           }
 
           this.busy = true;
           try {
-            const keys = await this.getKeys();
+            const keys = isSaveAs ? await this.deriveKeys(targetPage, this.password) : await this.getKeys();
             const payload = JSON.stringify(this.entries);
             const hash = await sha256(payload);
             const { iv, ct } = await aesEncrypt(payload, keys.pkB);
@@ -457,13 +461,24 @@
               const text = await res.text().catch(() => "");
               alert(`Error: ${res.status} ${res.statusText}\n${text}`);
             } else {
-              this.loaded = true;
-              this.dirty = false;
-              this.lastSyncedPage = this.page;
-              alert("Saved");
+              if (isSaveAs) {
+                alert(`Saved copy to: ${targetPage}`);
+              } else {
+                this.loaded = true;
+                this.dirty = false;
+                this.lastSyncedPage = this.page;
+                alert("Saved");
+              }
             }
-          } catch (e) { console.error(e); alert("Save failed"); }
+          } catch (e) { console.error(e); alert(isSaveAs ? "Save as failed" : "Save failed"); }
           finally { this.busy = false; }
+        },
+
+        async saveAsPage() {
+          const targetPage = prompt("Save copy as (page name):");
+          if (!targetPage || targetPage === null) return;
+          if (targetPage.trim() === "") return alert("Page name cannot be empty");
+          await this.savePage(targetPage);
         },
 
         async loadPage() {
@@ -549,6 +564,7 @@
             <details class="tools">
               <summary class="btn btn-ghost">Tools &#9662;</summary>
               <div class="menu">
+                <button class="btn btn-ghost" @click="saveAsPage(); closeMenu($event)">Save as...</button>
                 <button class="btn btn-ghost" @click="exportEntries(); closeMenu($event)">Export</button>
                 <button class="btn btn-ghost" @click="showImport = true; closeMenu($event)">Import old format</button>
                 <button class="btn btn-ghost" @click="storeCredentials(); closeMenu($event)">Cache credentials</button>
