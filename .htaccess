@@ -1,3 +1,8 @@
-RewriteEngine on
-RewriteCond $1 !^(\w+\.html|\w+\.php|media|new|robots\.txt)
+RewriteEngine On
+
+# Redirect old /new paths to new SPA
+RewriteRule ^new(/.*)?$ /new.html [R=301,L]
+
+# SPA fallback
+RewriteCond $1 !^(\w+\.html|\w+\.php|media|new\.html|robots\.txt)
 RewriteRule ^(.*)$ /index.html [L]
