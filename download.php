@@ -6,7 +6,7 @@ if(!$_GET['keyhash']) {
   exit;
 }
 
-$keyhash = preg_replace('[^0-9a-f]', '', $_GET['keyhash']);
+$keyhash = preg_replace('/[^0-9a-f]/', '', $_GET['keyhash']);
 
 include 'config.php'; # get DB_PASSWORD
 $mysql = @mysqli_connect("localhost", "jokkebk_cryptiki", DB_PASSWORD, "jokkebk_cryptiki");
@@ -21,7 +21,7 @@ if(mysqli_num_rows($result) == 0) {
 }
 
 list($contenthash, $content) = mysqli_fetch_row($result);
-mysqli_query("UPDATE pages SET accessed = NOW() WHERE keyhash = '$keyhash'"); # note when accessed
+mysqli_query($mysql, "UPDATE pages SET accessed = NOW() WHERE keyhash = '$keyhash'"); # note when accessed
 
 header('Content-disposition: attachment; filename=cryptiki_backup.html');
 header('Content-type: text/html');
