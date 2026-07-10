@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Cryptiki.com legacy data export">
+<meta name="author" content="Joonas Pihlajamaa">
+<link rel="icon" href="/media/icon/favicon.ico">
+
+<title>Cryptiki.com - Legacy data export</title>
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+<link rel="stylesheet" href="/media/css/style.css">
+
+<!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+<!--[if lt IE 9]>
+  <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+  <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+<![endif]-->
+</head>
+
+<body role="document">
+
+<div class="container" role="main">
+
+  <div class="row">
+    <div class="col-md-12">
+      <h1>Cryptiki legacy data export</h1>
+
+      <div class="alert alert-warning" role="alert">
+        <h2 style="font-size: 1.25em; margin-top: 0;">Deprecation notice</h2>
+        <p>This legacy version is read-only. You can open existing data, copy it
+        into the <a href="/" target="_blank" rel="noopener">current Cryptiki</a>,
+        or download an encrypted backup, but you can no longer save changes here.</p>
+        <p style="margin-bottom: 0;"><strong>To migrate:</strong> open your legacy
+        page, copy the decrypted text, then choose <em>Tools &gt; Import old format</em>
+        in the current version. Import the text and save the new store. Verify the
+        migrated store before relying on it.</p>
+      </div>
+
+      <form class="form-inline">
+        <div class="form-group">
+          <label for="pagename">Page name</label>
+          <input type="text" class="form-control" id="pagename" placeholder="Enter page name">
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" class="form-control" id="password" placeholder="Password">
+        </div>
+        <button id="openbutton" type="submit" class="btn btn-primary">
+          <span class="glyphicon glyphicon-open" aria-hidden="true"></span> Open
+        </button>
+        <button id="copybutton" type="button" class="btn btn-primary editpage">
+          <span class="glyphicon glyphicon-copy" aria-hidden="true"></span> Copy decrypted text
+        </button>
+        <button id="backupbutton" type="button" class="btn btn-default">
+          <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download encrypted backup
+        </button>
+        <a class="btn btn-default" href="/" target="_blank" rel="noopener">Open current Cryptiki</a>
+      </form>
+
+      <hr class="editpage">
+      <p class="editpage"><textarea id="content" readonly aria-label="Decrypted legacy content" style="width: 100%; height: 400px"></textarea></p>
+      <p class="help-block editpage">The text above is decrypted locally and cannot be edited on this page.</p>
+    </div> <!-- col -->
+  </div> <!-- row -->
+
+  <div class="row">
+    <div class="col-md-12">
+      <hr>
+      <p>Copyright &copy; <a href="http://joonaspihlajamaa.com">Joonas
+        Pihlajamaa</a> 2009-2015. All rights reserved. <strong>No warranties of any
+        kind, use purely on your own risk!</strong> <a
+        href="http://en.wikipedia.org/wiki/Advanced_Encryption_Standard">AES</a>
+      cipher routines by <a
+        href="http://www.movable-type.co.uk/scripts/aes.html">Chris Veness</a>.
+      <a href="http://en.wikipedia.org/wiki/SHA_hash_functions">SHA-2</a> hash
+      routines <a href="http://anmar.eu.org/projects/jssha2/">Angel Marin</a>.</p>
+    </div> <!-- col -->
+  </div> <!-- row -->
+
+</div> <!-- /container -->
+
+<script src="https://code.jquery.com/jquery-2.1.3.min.js"></script>
+<script type="text/javascript" src="/media/js/sha256.js"></script>
+<script type="text/javascript" src="/media/js/aes256.js"></script>
+<script type="text/javascript">
+$(document).ready(function() {
+  $('#openbutton').click(function(ev) {
+    ev.preventDefault();
+    var key = $('#pagename').val(), pass = $('#password').val();
+    var keyhash = hex_sha256(key), content;
+
+    if(key == '' || pass == '') {
+      alert('Please enter page key and password first!');
+      return;
+    }
+
+    $('.editpage').hide();
+    $('#content').val('');
+
+    $.ajax({
+      url: "/get.php", data: "keyhash=" + keyhash, method: 'POST'
+    }).done(function(res) {
+      if(res.error) {
+        alert(res.error);
+        return;
+      }
+
+      var content;
+
+      if(res.content.length == 0) {
+        alert('No legacy data was found for this page name.');
+        return;
+      }
+
+      while(true) { // try to decrypt until correct password or user abort
+        content = AESDecryptCtr(res.content, pass, 256);
+        if(res.contenthash == hex_sha256(content)) break;
+        pass = prompt('Invalid password! Please try again:');
+        if(!pass) return;
+        $('#password').val(pass);
+      }
+
+      $('#content').val(content);
+      $('.editpage').show();
+    });
+  });
+
+  $('#copybutton').click(function() {
+    var content = document.getElementById('content');
+    content.select();
+    content.setSelectionRange(0, content.value.length);
+
+    if(navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(content.value).then(function() {
+        alert('Decrypted text copied.');
+      }, function() {
+        alert('Copy failed. Select the text and copy it manually.');
+      });
+    } else if(document.execCommand('copy')) {
+      alert('Decrypted text copied.');
+    } else {
+      alert('Copy failed. Select the text and copy it manually.');
+    }
+  });
+
+  $('#backupbutton').click(function(ev) {
+    var key = $('#pagename').val();
+    if(key == '') {
+      alert('Empty page name!');
+      return;
+    }
+    var keyhash = hex_sha256(key);
+    window.location = '/download.php?keyhash='+keyhash;
+  });
+
+  var page = location.pathname.substr(1);
+  if(page != '' && page.toLowerCase() != 'legacy.html') {
+    $('#pagename').val(page);
+    $('#password').val('default');
+    $('#openbutton').click();
+  }
+});
+</script>
+</body>
+</html>
