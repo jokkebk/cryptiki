@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cryptiki legacy migration</title>
 <style>
-:root{font:16px/1.45 system-ui,sans-serif;color:#172033;background:#f5f7fb;--blue:#155eef;--border:#d9e0ec;--muted:#667085}*{box-sizing:border-box}body{margin:0}main{max-width:960px;margin:auto;padding:1rem}.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:1rem;margin:.8rem 0;box-shadow:0 2px 8px #1720330d}h1{font-size:1.35rem;margin:0}h2{font-size:1rem;margin:.1rem 0 .7rem}label{display:grid;gap:.25rem;font-weight:600}input,select,button{font:inherit}input,select{border:1px solid var(--border);border-radius:8px;padding:.55rem;width:100%}button{border:1px solid var(--border);border-radius:8px;background:#fff;padding:.55rem .75rem;cursor:pointer}button:focus,input:focus,select:focus{outline:3px solid #155eef33;border-color:var(--blue)}button.primary{background:var(--blue);border-color:var(--blue);color:#fff}.row{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap}.grid{display:grid;gap:.7rem}@media(min-width:640px){.grid.two{grid-template-columns:1fr 1fr}}.muted{color:var(--muted);font-size:.9rem}.warning{border-left:4px solid #f79009;background:#fffaeb}.error{border-left:4px solid #b42318;background:#fff1f0;color:#8e1d14}.success{border-left:4px solid #12b76a;background:#ecfdf3}.progress{width:100%;height:.55rem}table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{text-align:left;vertical-align:top;padding:.55rem;border-bottom:1px solid var(--border);white-space:pre-wrap;word-break:break-word}th{background:#f5f7fb}code{word-break:break-all}footer{text-align:center;color:var(--muted);font-size:.8rem;padding:1rem}[hidden]{display:none!important}body.busy button{cursor:wait}
+:root{font:16px/1.45 system-ui,sans-serif;color:#172033;background:#f5f7fb;--blue:#155eef;--border:#d9e0ec;--muted:#667085}*{box-sizing:border-box}body{margin:0}main{max-width:960px;margin:auto;padding:1rem}.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:1rem;margin:.8rem 0;box-shadow:0 2px 8px #1720330d}h1{font-size:1.35rem;margin:0}h2{font-size:1rem;margin:.1rem 0 .7rem}label{display:grid;gap:.25rem;font-weight:600}input,select,button{font:inherit}input,select{border:1px solid var(--border);border-radius:8px;padding:.55rem;width:100%}button{border:1px solid var(--border);border-radius:8px;background:#fff;padding:.55rem .75rem;cursor:pointer}button:focus,input:focus,select:focus{outline:3px solid #155eef33;border-color:var(--blue)}button.primary{background:var(--blue);border-color:var(--blue);color:#fff}.row{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap}.grid{display:grid;gap:.7rem}@media(min-width:640px){.grid.two{grid-template-columns:1fr 1fr}}.muted{color:var(--muted);font-size:.9rem}.warning{border-left:4px solid #f79009;background:#fffaeb}.error{border-left:4px solid #b42318;background:#fff1f0;color:#8e1d14}.success{border-left:4px solid #12b76a;background:#ecfdf3}.progress{width:100%;height:.55rem}table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{text-align:left;vertical-align:top;padding:.55rem;border-bottom:1px solid var(--border);white-space:pre-wrap;word-break:break-word}th{background:#f5f7fb}code{word-break:break-all}footer{text-align:center;color:var(--muted);font-size:.8rem;padding:1rem}[hidden]{display:none!important}body.busy button{cursor:wait}.debug{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
 </style>
 </head>
 <body>
@@ -18,6 +18,7 @@
 <label>Recovery code (optional)<input id="recovery-code" inputmode="text" autocomplete="off" placeholder="32-byte keyhash, hex"><span class="muted">Use only a row-specific code from offline support.</span></label>
 <div class="row"><button class="primary" id="recover" type="submit">Recover locally</button><button id="clear" type="button">Clear</button></div>
 </form><progress id="progress" class="progress" max="1" value="0" aria-label="Recovery progress" hidden></progress><p id="status" class="muted" aria-live="polite"></p></section>
+<p id="debug-output" class="muted debug" hidden aria-live="polite"></p>
 <section id="preview-card" class="card" hidden><h2>Recovered entries</h2><p class="muted">Review this local preview before creating the new vault. Recovered values are rendered as text, never as HTML.</p><div id="preview"></div><form id="create-form" class="grid two"><label>New v3 vault name<input id="new-name" autocomplete="username" required></label><label>New master password<input id="new-password" type="password" autocomplete="new-password" required></label><label>Confirm new master password<input id="confirm-password" type="password" autocomplete="new-password" required></label><div class="row"><button class="primary" id="create" type="submit">Create fresh v3 vault</button></div></form><p class="muted">The new password must differ from the old password. Creating a new vault does not rotate the passwords stored inside it; change those separately.</p></section>
 <section id="result-card" class="card success" hidden><h2>Migration complete</h2><p>Your recovered entries were verified after being encrypted into a new v3 vault.</p><p><strong>Next step:</strong> rotate the recovered account passwords, especially any credential that was reused or important.</p><button id="restart" type="button">Migrate another vault</button></section>
 <section id="failure-card" class="card error" hidden><h2>Recovery failed</h2><p id="failure">Check the page name, password, format, or recovery code and try again. The tool intentionally does not reveal which check failed.</p><button id="retry" type="button">Try again</button></section>
@@ -1589,11 +1590,19 @@ async function decryptV3(blob, key) {
 
 
 const API_BASE = (globalThis.MIGRATION_API || (location.protocol === "file:" ? "https://cryptiki.com" : "")).replace(/\/$/, "");
+const DEBUG = new URL(location.href).searchParams.get("debug") === "1";
 const state = { oldPassword: "", entries: null, legacy: null, capsule: null, keys: null };
 const $ = id => document.getElementById(id);
 const recoveryArgon2 = (password, salt, options) => globalThis.argon2idAsync(password, salt, { ...options, onProgress: value => { $("progress").value = value; } });
 
 function status(message, error = false) { $("status").textContent = message; $("status").className = error ? "error" : "muted"; }
+function debug(message) {
+  if (!DEBUG) return;
+  const line = `[debug] ${message}`;
+  console.info(`[Cryptiki migration] ${message}`);
+  const output = $("debug-output");
+  if (output) { output.hidden = false; output.textContent += `${output.textContent ? "\n" : ""}${line}`; }
+}
 function busy(value) { document.body.classList.toggle("busy", value); for (const id of ["recover", "clear", "create", "retry", "restart"]) if ($(id)) $(id).disabled = value; }
 function wipe(value) {
   if (value instanceof Uint8Array) value.fill(0);
@@ -1613,25 +1622,32 @@ function genericFailure() {
 }
 function apiHeaders(auth) { return { Authorization: `Bearer ${b64(auth)}`, "Content-Type": "application/json" }; }
 
-async function fetchCapsule(lookupId) {
+async function fetchCapsule(format, lookupId) {
+  debug(`v${format}: lookup prefix ${lookupId.slice(0, 12)}…`);
   const response = await fetch(`${API_BASE}/api/legacy/recover`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lookupId }), cache: "no-store" });
+  debug(`v${format}: recovery endpoint HTTP ${response.status}`);
   if (response.status === 404) return null;
-  if (!response.ok) throw Error("recovery unavailable");
+  if (!response.ok) throw Error(`recovery unavailable (HTTP ${response.status})`);
   const value = await response.json();
   if ((value.format !== 1 && value.format !== 2) || typeof value.blob !== "string") throw Error("invalid recovery response");
-  return { format: value.format, blob: unb64(value.blob, MAX_CONTENT + 64 * 1024) };
+  const blob = unb64(value.blob, MAX_CONTENT + 64 * 1024);
+  debug(`v${format}: received v${value.format} capsule (${blob.length} bytes)`);
+  return { format: value.format, blob };
 }
 
 async function tryCandidate(format, name, password, recoveryCode) {
+  debug(`v${format}: deriving legacy and capsule keys`);
   const material = await deriveLegacy(format, name, password, recoveryCode);
   const capsuleMaterial = await deriveCapsuleMaterial(format, material.keyhash, material.passhash, recoveryArgon2);
-  const remote = await fetchCapsule(capsuleMaterial.lookupId);
-  if (!remote || remote.format !== format) return null;
+  const remote = await fetchCapsule(format, capsuleMaterial.lookupId);
+  if (!remote) { debug(`v${format}: no capsule matched`); return null; }
+  if (remote.format !== format) { debug(`v${format}: capsule format mismatch`); return null; }
   let capsule;
-  try { capsule = await decryptCapsule(remote.blob, capsuleMaterial.wrapKey, format); } catch { return null; }
+  try { capsule = await decryptCapsule(remote.blob, capsuleMaterial.wrapKey, format); } catch (error) { debug(`v${format}: capsule AES-GCM failed (${error?.message || "unknown error"})`); return null; }
   let plaintext;
-  try { plaintext = format === 1 ? await v1Decrypt(capsule.content, password) : await v2Decrypt(capsule.content, material.passhash); } catch { return null; }
-  if (!await verifyPlaintext(plaintext, capsule.contentHash)) return null;
+  try { plaintext = format === 1 ? await v1Decrypt(capsule.content, password) : await v2Decrypt(capsule.content, material.passhash); } catch (error) { debug(`v${format}: legacy AES failed (${error?.message || "unknown error"})`); return null; }
+  if (!await verifyPlaintext(plaintext, capsule.contentHash)) { debug(`v${format}: plaintext hash failed`); return null; }
+  debug(`v${format}: plaintext hash passed; parsing entries`);
   return { format, plaintext, entries: parseLegacyEntries(plaintext, format), material, capsuleMaterial, capsule };
 }
 
@@ -1656,18 +1672,20 @@ async function recover(event) {
   const name = $("old-name").value.trim(), password = $("old-password").value, recoveryCode = $("recovery-code").value.trim();
   if (!name && !recoveryCode || !password) return status("Enter the old password and either the page name or recovery code", true);
   const selected = Number($("legacy-format").value), formats = selected ? [selected] : [1, 2];
+  if ($("debug-output")) { $("debug-output").textContent = ""; $("debug-output").hidden = !DEBUG; }
   busy(true); show("failure-card", false); $("progress").hidden = false; $("progress").value = 0; status("Deriving a memory-hard recovery lookup…");
+  debug(`starting formats ${formats.map(format => `v${format}`).join(", ")}`);
   try {
     let recovered = null;
     for (const format of formats) {
-      try { recovered = await tryCandidate(format, name, password, recoveryCode); } catch { recovered = null; }
+      try { recovered = await tryCandidate(format, name, password, recoveryCode); } catch (error) { debug(`v${format}: candidate failed (${error?.message || "unknown error"})`); recovered = null; }
       if (recovered) break;
     }
     if (!recovered) throw Error("recovery failed");
     state.oldPassword = password; state.legacy = recovered.material; state.capsule = recovered.capsuleMaterial; state.entries = recovered.entries;
     $("old-password").value = ""; $("new-name").value = name; renderPreview(state.entries);
     show("preview-card", true); $("progress").hidden = true; status(`Recovered and verified locally as v${recovered.format}. Choose new credentials.`); busy(false);
-  } catch { genericFailure(); }
+  } catch (error) { debug(`recovery failed (${error?.message || "unknown error"})`); genericFailure(); }
 }
 
 async function createVault(event) {
@@ -1696,6 +1714,7 @@ async function createVault(event) {
 function restart() { clearSensitive(); $("failure").textContent = "Check the page name, password, format, or recovery code and try again. The tool intentionally does not reveal which check failed."; show("result-card", false); show("failure-card", false); show("preview-card", false); show("recovery-card", true); status(""); $("old-name").focus(); }
 
 window.addEventListener("DOMContentLoaded", () => {
+  if (DEBUG) debug("debug mode enabled; lookup IDs are shown only as 12-character prefixes");
   $("recovery-form").addEventListener("submit", recover); $("create-form").addEventListener("submit", createVault); $("clear").addEventListener("click", restart); $("retry").addEventListener("click", restart); $("restart").addEventListener("click", restart); $("old-name").focus();
 });
 </script>

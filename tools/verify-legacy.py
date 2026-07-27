@@ -409,7 +409,7 @@ def parse_entry_count(plaintext: bytes, format_number: int) -> int | None:
         return None
 
 
-def verify(format_number: int, page: str, password: str, recovery_code: str, rows: list[dict[str, Any]], capsule_file: Path | None, remote_url: str | None, node: str) -> int:
+def verify(format_number: int, page: str, password: str, recovery_code: str, rows: list[dict[str, Any]], capsule_file: Path | None, remote_url: str | None, node: str, debug: bool) -> int:
     keyhash, passhash = derive_legacy(format_number, page, password, recovery_code)
     matching = [row for row in rows if row["keyhash"].lower() == keyhash.hex()]
     print(f"Loaded {len(rows)} legacy rows from the SQL dump.")
@@ -450,6 +450,8 @@ def verify(format_number: int, page: str, password: str, recovery_code: str, row
     try:
         repo_root = Path(__file__).resolve().parents[1]
         lookup_id, wrap_key = node_capsule_material(repo_root, format_number, page, password, recovery_code, node)
+        if debug:
+            print(f"[DEBUG] v{format_number} lookup-ID prefix: {lookup_id[:12]}…")
         if capsule_file:
             capsule_blob = load_capsule_jsonl(capsule_file, lookup_id)
             source = str(capsule_file)
@@ -458,6 +460,8 @@ def verify(format_number: int, page: str, password: str, recovery_code: str, row
                 return 5
         else:
             status, capsule_blob = fetch_capsule(remote_url or "", lookup_id)
+            if debug:
+                print(f"[DEBUG] v{format_number} recovery endpoint HTTP status: {status}")
             if status == 404 or capsule_blob is None:
                 print("[FAIL] production capsule lookup: endpoint returned 404")
                 print("       The raw dump works, so this is a capsule-derivation/import or deployment mismatch.")
@@ -489,6 +493,7 @@ def main() -> int:
     parser.add_argument("--capsules", type=Path, help="local capsules.jsonl produced by build-legacy-capsules.mjs")
     parser.add_argument("--url", help="deployment base URL; fetches only the opaque recovery lookup ID")
     parser.add_argument("--node", default="node", help="Node.js executable used for optional Argon2id capsule derivation")
+    parser.add_argument("--debug", action="store_true", help="show safe stage details and a 12-character lookup-ID prefix")
     args = parser.parse_args()
     if not args.dump.is_file():
         parser.error(f"dump does not exist: {args.dump}")
@@ -507,7 +512,7 @@ def main() -> int:
     recovery_code = args.recovery_code or getpass.getpass("Recovery code from the old page, hidden; blank to derive from page name: ").strip()
     formats = [int(args.format)] if args.format != "auto" else [1, 2]
     for format_number in formats:
-        result = verify(format_number, page, password, recovery_code, rows, args.capsules, args.url, args.node)
+        result = verify(format_number, page, password, recovery_code, rows, args.capsules, args.url, args.node, args.debug)
         if result == 0 or args.format != "auto":
             return result
         print("Trying the other legacy format…")

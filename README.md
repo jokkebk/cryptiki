@@ -124,6 +124,12 @@ recovery endpoint:
 python3 tools/verify-legacy.py --format 2 --url https://cryptiki.com
 ```
 
+Add `--debug` to show safe stage details and the first 12 characters of the
+opaque lookup ID. The browser migration page has the matching opt-in mode at
+`https://cryptiki.com/legacy-migration?debug=1`; it displays candidate format,
+lookup prefix, HTTP status, capsule size, and the failing stage without showing
+passwords, full lookup IDs, ciphertext, or plaintext.
+
 If the generated local JSONL capsule file is available, verify that instead:
 
 ```sh

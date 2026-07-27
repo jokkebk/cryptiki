@@ -11,10 +11,10 @@
   Cache-Control: no-store
 
 /legacy-migration
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-tKSyAuG4f9UpBKKUdilr+dfNFkQ514WGdVrslra+9lI='; style-src 'sha256-8WAydMX/FL0wCJbkQIyuJh3Hl439MOkbD3Ad3SeYy4E='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-XmGu66bmnr2O0xjIdXn2XSjMSVKZZkHVi6wj2124KgY='; style-src 'sha256-xoiS6cEK9/TtRlpYS4VnrrG2Pi2TJQD8E5lQIRWpQ48='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 
 /legacy-migration/
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-tKSyAuG4f9UpBKKUdilr+dfNFkQ514WGdVrslra+9lI='; style-src 'sha256-8WAydMX/FL0wCJbkQIyuJh3Hl439MOkbD3Ad3SeYy4E='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-XmGu66bmnr2O0xjIdXn2XSjMSVKZZkHVi6wj2124KgY='; style-src 'sha256-xoiS6cEK9/TtRlpYS4VnrrG2Pi2TJQD8E5lQIRWpQ48='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 
 /migrate
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-tKSyAuG4f9UpBKKUdilr+dfNFkQ514WGdVrslra+9lI='; style-src 'sha256-8WAydMX/FL0wCJbkQIyuJh3Hl439MOkbD3Ad3SeYy4E='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-XmGu66bmnr2O0xjIdXn2XSjMSVKZZkHVi6wj2124KgY='; style-src 'sha256-xoiS6cEK9/TtRlpYS4VnrrG2Pi2TJQD8E5lQIRWpQ48='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
