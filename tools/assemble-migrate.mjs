@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { syncCspHashes } from "./csp.mjs";
 
 const root = new URL("..", import.meta.url);
 const read = name => readFileSync(new URL(name, root), "utf8");
@@ -9,3 +10,4 @@ const argon2 = `${vendor}\nglobalThis.argon2idAsync = argon2idAsync;`;
 const core = read("src/migration-core.js").replace(/^export\s+\{[^}]+\};?\n/gm, "").replace(/export\s+(?=(const|function|class|async function)\b)/g, "");
 const html = read("tools/migration-template.html").replace("/* __ARGON2__ */", argon2).replace("/* __CORE__ */", core).replace("/* __MIGRATION_APP__ */", read("src/migration.js"));
 writeFileSync(new URL("public/migrate.html", root), html);
+syncCspHashes("migrate.html", html);

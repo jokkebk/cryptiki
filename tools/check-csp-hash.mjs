@@ -1,15 +1,19 @@
 import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { inlineHashes, routes } from "./csp.mjs";
 
 const headers = readFileSync(new URL("../public/_headers", import.meta.url), "utf8");
-const hash = value => `sha256-${createHash("sha256").update(value).digest("base64")}`;
-for (const name of ["index.html", "migrate.html"]) {
+const blocks = headers.split(/(?=^\/)/m);
+for (const [name, paths] of Object.entries(routes)) {
   const html = readFileSync(new URL(`../public/${name}`, import.meta.url), "utf8");
-  const style = html.match(/<style>([\s\S]*?)<\/style>/)?.[1];
-  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-  if (!style || !script) throw Error(`${name} must contain one inline style and script`);
-  for (const expected of [hash(script), hash(style)]) if (!headers.includes(expected)) throw Error(`Missing CSP hash for ${name}: ${expected}`);
+  const { style, script } = inlineHashes(name, html);
+  for (const path of paths) {
+    const block = blocks.find(b => b.match(/^(\S+)/)?.[1] === path);
+    if (!block) throw Error(`public/_headers has no block for ${path}`);
+    for (const expected of [script, style]) {
+      if (!block.includes(expected)) throw Error(`Stale CSP hash for ${path} (${name}): expected ${expected}. Run npm run assemble${name === "migrate.html" ? ":migrate" : ""}`);
+    }
+  }
   if (/<script[^>]+src=|<link[^>]+href=/.test(html)) throw Error(`${name} has an external dependency`);
-  console.log(`${name} CSP hashes verified: ${hash(script)} ${hash(style)}`);
+  console.log(`${name} CSP hashes verified on ${paths.join(", ")}: ${script} ${style}`);
 }
 if (headers.includes("REPLACE_")) throw Error("CSP placeholders remain");

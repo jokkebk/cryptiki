@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { syncCspHashes } from "./csp.mjs";
 
 const root = new URL("..", import.meta.url);
 const read = name => readFileSync(new URL(name, root), "utf8");
@@ -8,3 +9,4 @@ const vendor = ["/* @noble/hashes 1.8.0 Argon2id vendor; MIT; source hash record
 const bundled = `${vendor}\nglobalThis.argon2idAsync = argon2idAsync;`;
 const html = read("tools/index-template.html").replace("/* __VENDOR__ */", bundled).replace("/* __CLIENT__ */", read("src/client.js"));
 writeFileSync(new URL("public/index.html", root), html);
+syncCspHashes("index.html", html);
