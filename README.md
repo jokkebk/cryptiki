@@ -23,11 +23,11 @@ writer with direct D1 or Worker control can delete or replace ciphertext; AES-GC
 detects replacement but cannot prevent denial of service. Exports and
 infrastructure backups are the recovery controls.
 
-The Worker rejects decoded blobs over 128 KiB, malformed identifiers and
-requests, and has explicit create/failed-auth rate-limit extension points for
-Cloudflare configuration. A production deployment must add Cloudflare rate
-limits per IP and per vault ID plus a total-vault-count alarm or guard before
-public use. The preview deployment is deliberately separate from `cryptiki.com`.
+The Worker rejects decoded blobs over 128 KiB and malformed identifiers and
+requests. Production uses Cloudflare rate limits per IP and per vault ID;
+Cloudflare should also have a total-vault-count alarm or guard before any
+large public rollout. The preview deployment is deliberately separate from
+`cryptiki.com`.
 
 ## Cryptographic format
 
@@ -55,14 +55,26 @@ service worker, or runtime CDN. The preview acceptance checklist also covers
 keyboard-only use, a narrow viewport, credential change, saved-file API use,
 and browser network inspection showing zero third-party requests.
 
-## Preview deployment
+## Deployments and releases
 
 Create a preview-only D1 database and Worker/static-assets project, apply
 `migrations/0001_init.sql`, configure the `DB` binding and Cloudflare rate
 limits, then deploy with Wrangler using `wrangler.jsonc`. Never attach the
-production DNS name or delete legacy data from this repository. Releases should
-be deliberate version tags and should report the git commit SHA plus the
-SHA-256 of the served `public/index.html`.
+production DNS name or delete legacy data from the preview configuration.
+
+The production configuration is `wrangler.production.jsonc`. It uses the
+separate `cryptiki-v3-production` D1 database, production rate-limit namespaces,
+and the `cryptiki.com` custom-domain route. Apply `migrations/0001_init.sql`
+before its first deployment. The production GitHub Actions workflow runs on
+pushes to `main` and deploys that configuration using the repository secrets
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in the `production`
+environment. Therefore, after those secrets and the custom domain are set up,
+a push to `main` does update the Worker served at `cryptiki.com`; a push to
+another branch does not. GitHub Actions deploys code only: it does not migrate
+legacy data or change Namecheap nameservers.
+
+Releases should report the git commit SHA plus the SHA-256 of the served
+`public/index.html`. Keep production and preview database IDs separate.
 
 The retirement notice intentionally links to `/legacy-migration`, an extension
 point for the separate temporary migration tool. v1/v2 migration and recovery

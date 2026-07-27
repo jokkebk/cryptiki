@@ -1,6 +1,6 @@
 /* Cryptiki v3 browser client. Secrets live only in this closure and memory. */
 const API = (location.protocol === "file:" ? "https://cryptiki.com" : "").replace(/\/$/, "");
-const VERSION = "3.0.0-preview";
+const VERSION = "3.0.0";
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 const $ = id => document.getElementById(id);

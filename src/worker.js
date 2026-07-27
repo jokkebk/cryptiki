@@ -1,7 +1,7 @@
 const MAX_BLOB = 128 * 1024;
 const MAX_BODY = 180 * 1024;
 const ID_RE = /^[0-9a-f]{32}$/;
-const ASSET_VERSION = "1aac3a6c0bddd585e9e106776da56a04cc701e545d3ea0e4a91667b949fc9dfc";
+const ASSET_VERSION = "928b23b86f4fe4c843b41f0944089c96bc1d8468263171c5d9ed6aeb6dd1fe17";
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
 
 function headers(origin) {
