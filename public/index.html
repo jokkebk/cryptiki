@@ -1,0 +1,1525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cryptiki v3</title>
+<style>
+:root{font:16px/1.45 system-ui,sans-serif;color:#172033;background:#f5f7fb;--blue:#155eef;--border:#d9e0ec}*{box-sizing:border-box}body{margin:0}main{max-width:900px;margin:auto;padding:1rem}.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:1rem;margin:.8rem 0;box-shadow:0 2px 8px #1720330d}h1{font-size:1.35rem;margin:0}h2{font-size:1rem;margin:.1rem 0 .7rem}label{display:grid;gap:.25rem;font-weight:600}input,textarea,button{font:inherit}input,textarea{border:1px solid var(--border);border-radius:8px;padding:.55rem;width:100%}textarea{min-height:5rem}button{border:1px solid var(--border);border-radius:8px;background:#fff;padding:.55rem .75rem;cursor:pointer}button:focus,input:focus,textarea:focus{outline:3px solid #155eef33;border-color:var(--blue)}button.primary{background:var(--blue);border-color:var(--blue);color:#fff}button.danger{color:#b42318}.row{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap}.grid{display:grid;gap:.7rem}@media(min-width:640px){.grid.two{grid-template-columns:1fr 1fr}}.muted{color:#667085;font-size:.9rem}.error{color:#b42318}.entry{display:grid;grid-template-columns:1fr auto auto auto;gap:.6rem;align-items:center;border-bottom:1px solid var(--border);padding:.7rem 0}.entry:last-child{border:0}.entry span{color:#667085;font-size:.9rem}.top{display:flex;justify-content:space-between;gap:1rem;align-items:start}.notice{border-left:4px solid #f79009;background:#fffaeb}.notice button{float:right}.conflict{border-left:4px solid #b42318;background:#fff1f0}footer{text-align:center;color:#667085;font-size:.8rem;padding:1rem}progress{width:100%;height:.5rem}body.busy button{cursor:wait} [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<header class="top"><div><h1>Cryptiki</h1><div class="muted">A small, zero-knowledge vault</div></div><span class="muted" id="status">Locked</span></header>
+<section id="notice" class="card notice"><button id="dismiss" aria-label="Dismiss notice">×</button><strong>v1/v2 retirement notice</strong><p class="muted">The temporary legacy recovery tool is documented separately. This vault has no legacy compatibility code.</p><a href="/legacy-migration">Open the migration tool</a></section>
+<section id="unlock-screen" class="card"><h2>Unlock or create a vault</h2><div class="grid"><label>Vault name<input id="name" autocomplete="username"></label><label>Master password<input id="master-password" type="password" autocomplete="current-password"></label><progress id="progress" max="1" value="0" aria-label="Unlock progress"></progress><div class="row"><button id="unlock" class="primary">Unlock</button><button id="create">Create new vault</button></div><p class="muted">Nothing is remembered in browser storage. Name, password, plaintext, and keys stay in memory.</p></div></section>
+<section id="editor-screen" hidden><div class="card"><div class="top"><div><h2>Entries <span class="muted" id="count">0 / 0</span></h2><input id="search" placeholder="Search entries" aria-label="Search entries"></div><div class="row"><button id="new-entry" class="primary">New</button><button id="lock">Lock</button></div></div><div id="entries" aria-live="polite"></div></div>
+<div id="conflict" class="card conflict" hidden><strong>Save conflict</strong><p>Another client has saved this vault. Choose which copy to keep locally.</p><div class="row"><button id="reload-theirs">Reload theirs</button><button id="download-mine">Download mine</button></div></div>
+<div class="card"><h2>Entry</h2><div class="grid two"><label>Service<input id="service" autocomplete="off"></label><label>Username<input id="username" autocomplete="off"></label><label>Password<div class="row"><input id="entry-password" type="password" autocomplete="new-password"><button id="generate">Generate</button></div></label><label>Note<textarea id="note"></textarea></label></div><div class="row"><button id="save-entry" class="primary">Update entry</button><button id="delete-entry" class="danger">Delete entry</button></div></div>
+<div class="card"><h2>Vault tools</h2><div class="row"><button id="save">Save</button><button id="export">Encrypted export</button><button id="import">Encrypted import</button><button id="change">Change vault credentials</button><button id="save-app">Save this app</button></div></div></section>
+</main>
+<footer>Cryptiki <span id="version"></span> · commit <code>source</code> · page SHA-256 <code id="page-hash">pending</code></footer>
+<script>/* @noble/hashes 1.8.0 Argon2id vendor; MIT; source hash recorded in README. */
+const crypto = globalThis.crypto;
+/**
+ * Utilities for hex, bytes, CSPRNG.
+ * @module
+ */
+/*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) */
+// We use WebCrypto aka globalThis.crypto, which exists in browsers and node.js 16+.
+// node.js versions earlier than v19 don't declare it in global scope.
+// For node.js, package.json#exports field mapping rewrites import
+// from `crypto` to `cryptoNode`, which imports native module.
+// Makes the utils un-importable in browsers without a bundler.
+// Once node.js 18 is deprecated (2025-04-30), we can just drop the import.
+/** Checks if something is Uint8Array. Be careful: nodejs Buffer will return true. */
+function isBytes(a) {
+    return a instanceof Uint8Array || (ArrayBuffer.isView(a) && a.constructor.name === 'Uint8Array');
+}
+/** Asserts something is positive integer. */
+function anumber(n) {
+    if (!Number.isSafeInteger(n) || n < 0)
+        throw new Error('positive integer expected, got ' + n);
+}
+/** Asserts something is Uint8Array. */
+function abytes(b, ...lengths) {
+    if (!isBytes(b))
+        throw new Error('Uint8Array expected');
+    if (lengths.length > 0 && !lengths.includes(b.length))
+        throw new Error('Uint8Array expected of length ' + lengths + ', got length=' + b.length);
+}
+/** Asserts something is hash */
+function ahash(h) {
+    if (typeof h !== 'function' || typeof h.create !== 'function')
+        throw new Error('Hash should be wrapped by utils.createHasher');
+    anumber(h.outputLen);
+    anumber(h.blockLen);
+}
+/** Asserts a hash instance has not been destroyed / finished */
+function aexists(instance, checkFinished = true) {
+    if (instance.destroyed)
+        throw new Error('Hash instance has been destroyed');
+    if (checkFinished && instance.finished)
+        throw new Error('Hash#digest() has already been called');
+}
+/** Asserts output is properly-sized byte array */
+function aoutput(out, instance) {
+    abytes(out);
+    const min = instance.outputLen;
+    if (out.length < min) {
+        throw new Error('digestInto() expects output buffer of length at least ' + min);
+    }
+}
+/** Cast u8 / u16 / u32 to u8. */
+function u8(arr) {
+    return new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
+}
+/** Cast u8 / u16 / u32 to u32. */
+function u32(arr) {
+    return new Uint32Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 4));
+}
+/** Zeroize a byte array. Warning: JS provides no guarantees. */
+function clean(...arrays) {
+    for (let i = 0; i < arrays.length; i++) {
+        arrays[i].fill(0);
+    }
+}
+/** Create DataView of an array for easy byte-level manipulation. */
+function createView(arr) {
+    return new DataView(arr.buffer, arr.byteOffset, arr.byteLength);
+}
+/** The rotate right (circular right shift) operation for uint32 */
+function rotr(word, shift) {
+    return (word << (32 - shift)) | (word >>> shift);
+}
+/** The rotate left (circular left shift) operation for uint32 */
+function rotl(word, shift) {
+    return (word << shift) | ((word >>> (32 - shift)) >>> 0);
+}
+/** Is current platform little-endian? Most are. Big-Endian platform: IBM */
+const isLE = /* @__PURE__ */ (() => new Uint8Array(new Uint32Array([0x11223344]).buffer)[0] === 0x44)();
+/** The byte swap operation for uint32 */
+function byteSwap(word) {
+    return (((word << 24) & 0xff000000) |
+        ((word << 8) & 0xff0000) |
+        ((word >>> 8) & 0xff00) |
+        ((word >>> 24) & 0xff));
+}
+/** Conditionally byte swap if on a big-endian platform */
+const swap8IfBE = isLE
+    ? (n) => n
+    : (n) => byteSwap(n);
+/** @deprecated */
+const byteSwapIfBE = swap8IfBE;
+/** In place byte swap for Uint32Array */
+function byteSwap32(arr) {
+    for (let i = 0; i < arr.length; i++) {
+        arr[i] = byteSwap(arr[i]);
+    }
+    return arr;
+}
+const swap32IfBE = isLE
+    ? (u) => u
+    : byteSwap32;
+// Built-in hex conversion https://caniuse.com/mdn-javascript_builtins_uint8array_fromhex
+const hasHexBuiltin = /* @__PURE__ */ (() => 
+// @ts-ignore
+typeof Uint8Array.from([]).toHex === 'function' && typeof Uint8Array.fromHex === 'function')();
+// Array where index 0xf0 (240) is mapped to string 'f0'
+const hexes = /* @__PURE__ */ Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+/**
+ * Convert byte array to hex string. Uses built-in function, when available.
+ * @example bytesToHex(Uint8Array.from([0xca, 0xfe, 0x01, 0x23])) // 'cafe0123'
+ */
+function bytesToHex(bytes) {
+    abytes(bytes);
+    // @ts-ignore
+    if (hasHexBuiltin)
+        return bytes.toHex();
+    // pre-caching improves the speed 6x
+    let hex = '';
+    for (let i = 0; i < bytes.length; i++) {
+        hex += hexes[bytes[i]];
+    }
+    return hex;
+}
+// We use optimized technique to convert hex string to byte array
+const asciis = { _0: 48, _9: 57, A: 65, F: 70, a: 97, f: 102 };
+function asciiToBase16(ch) {
+    if (ch >= asciis._0 && ch <= asciis._9)
+        return ch - asciis._0; // '2' => 50-48
+    if (ch >= asciis.A && ch <= asciis.F)
+        return ch - (asciis.A - 10); // 'B' => 66-(65-10)
+    if (ch >= asciis.a && ch <= asciis.f)
+        return ch - (asciis.a - 10); // 'b' => 98-(97-10)
+    return;
+}
+/**
+ * Convert hex string to byte array. Uses built-in function, when available.
+ * @example hexToBytes('cafe0123') // Uint8Array.from([0xca, 0xfe, 0x01, 0x23])
+ */
+function hexToBytes(hex) {
+    if (typeof hex !== 'string')
+        throw new Error('hex string expected, got ' + typeof hex);
+    // @ts-ignore
+    if (hasHexBuiltin)
+        return Uint8Array.fromHex(hex);
+    const hl = hex.length;
+    const al = hl / 2;
+    if (hl % 2)
+        throw new Error('hex string expected, got unpadded hex of length ' + hl);
+    const array = new Uint8Array(al);
+    for (let ai = 0, hi = 0; ai < al; ai++, hi += 2) {
+        const n1 = asciiToBase16(hex.charCodeAt(hi));
+        const n2 = asciiToBase16(hex.charCodeAt(hi + 1));
+        if (n1 === undefined || n2 === undefined) {
+            const char = hex[hi] + hex[hi + 1];
+            throw new Error('hex string expected, got non-hex character "' + char + '" at index ' + hi);
+        }
+        array[ai] = n1 * 16 + n2; // multiply first octet, e.g. 'a3' => 10*16+3 => 160 + 3 => 163
+    }
+    return array;
+}
+/**
+ * There is no setImmediate in browser and setTimeout is slow.
+ * Call of async fn will return Promise, which will be fullfiled only on
+ * next scheduler queue processing step and this is exactly what we need.
+ */
+const nextTick = async () => { };
+/** Returns control to thread each 'tick' ms to avoid blocking. */
+async function asyncLoop(iters, tick, cb) {
+    let ts = Date.now();
+    for (let i = 0; i < iters; i++) {
+        cb(i);
+        // Date.now() is not monotonic, so in case if clock goes backwards we return return control too
+        const diff = Date.now() - ts;
+        if (diff >= 0 && diff < tick)
+            continue;
+        await nextTick();
+        ts += diff;
+    }
+}
+/**
+ * Converts string to bytes using UTF8 encoding.
+ * @example utf8ToBytes('abc') // Uint8Array.from([97, 98, 99])
+ */
+function utf8ToBytes(str) {
+    if (typeof str !== 'string')
+        throw new Error('string expected');
+    return new Uint8Array(new TextEncoder().encode(str)); // https://bugzil.la/1681809
+}
+/**
+ * Converts bytes to string using UTF8 encoding.
+ * @example bytesToUtf8(Uint8Array.from([97, 98, 99])) // 'abc'
+ */
+function bytesToUtf8(bytes) {
+    return new TextDecoder().decode(bytes);
+}
+/**
+ * Normalizes (non-hex) string or Uint8Array to Uint8Array.
+ * Warning: when Uint8Array is passed, it would NOT get copied.
+ * Keep in mind for future mutable operations.
+ */
+function toBytes(data) {
+    if (typeof data === 'string')
+        data = utf8ToBytes(data);
+    abytes(data);
+    return data;
+}
+/**
+ * Helper for KDFs: consumes uint8array or string.
+ * When string is passed, does utf8 decoding, using TextDecoder.
+ */
+function kdfInputToBytes(data) {
+    if (typeof data === 'string')
+        data = utf8ToBytes(data);
+    abytes(data);
+    return data;
+}
+/** Copies several Uint8Arrays into one. */
+function concatBytes(...arrays) {
+    let sum = 0;
+    for (let i = 0; i < arrays.length; i++) {
+        const a = arrays[i];
+        abytes(a);
+        sum += a.length;
+    }
+    const res = new Uint8Array(sum);
+    for (let i = 0, pad = 0; i < arrays.length; i++) {
+        const a = arrays[i];
+        res.set(a, pad);
+        pad += a.length;
+    }
+    return res;
+}
+function checkOpts(defaults, opts) {
+    if (opts !== undefined && {}.toString.call(opts) !== '[object Object]')
+        throw new Error('options should be object or undefined');
+    const merged = Object.assign(defaults, opts);
+    return merged;
+}
+/** For runtime check if class implements interface */
+class Hash {
+}
+/** Wraps hash function, creating an interface on top of it */
+function createHasher(hashCons) {
+    const hashC = (msg) => hashCons().update(toBytes(msg)).digest();
+    const tmp = hashCons();
+    hashC.outputLen = tmp.outputLen;
+    hashC.blockLen = tmp.blockLen;
+    hashC.create = () => hashCons();
+    return hashC;
+}
+function createOptHasher(hashCons) {
+    const hashC = (msg, opts) => hashCons(opts).update(toBytes(msg)).digest();
+    const tmp = hashCons({});
+    hashC.outputLen = tmp.outputLen;
+    hashC.blockLen = tmp.blockLen;
+    hashC.create = (opts) => hashCons(opts);
+    return hashC;
+}
+function createXOFer(hashCons) {
+    const hashC = (msg, opts) => hashCons(opts).update(toBytes(msg)).digest();
+    const tmp = hashCons({});
+    hashC.outputLen = tmp.outputLen;
+    hashC.blockLen = tmp.blockLen;
+    hashC.create = (opts) => hashCons(opts);
+    return hashC;
+}
+const wrapConstructor = createHasher;
+const wrapConstructorWithOpts = createOptHasher;
+const wrapXOFConstructorWithOpts = createXOFer;
+/** Cryptographically secure PRNG. Uses internal OS-level `crypto.getRandomValues`. */
+function randomBytes(bytesLength = 32) {
+    if (crypto && typeof crypto.getRandomValues === 'function') {
+        return crypto.getRandomValues(new Uint8Array(bytesLength));
+    }
+    // Legacy Node.js compatibility
+    if (crypto && typeof crypto.randomBytes === 'function') {
+        return Uint8Array.from(crypto.randomBytes(bytesLength));
+    }
+    throw new Error('crypto.getRandomValues must be defined');
+}
+//# sourceMappingURL=utils.js.map
+
+/**
+ * Internal helpers for blake hash.
+ * @module
+ */
+/**
+ * Internal blake variable.
+ * For BLAKE2b, the two extra permutations for rounds 10 and 11 are SIGMA[10..11] = SIGMA[0..1].
+ */
+// prettier-ignore
+const BSIGMA = /* @__PURE__ */ Uint8Array.from([
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3,
+    11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4,
+    7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8,
+    9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13,
+    2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9,
+    12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11,
+    13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10,
+    6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5,
+    10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0,
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3,
+    // Blake1, unused in others
+    11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4,
+    7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8,
+    9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13,
+    2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9,
+]);
+// Mixing function G splitted in two halfs
+function G1s(a, b, c, d, x) {
+    a = (a + b + x) | 0;
+    d = rotr(d ^ a, 16);
+    c = (c + d) | 0;
+    b = rotr(b ^ c, 12);
+    return { a, b, c, d };
+}
+function G2s(a, b, c, d, x) {
+    a = (a + b + x) | 0;
+    d = rotr(d ^ a, 8);
+    c = (c + d) | 0;
+    b = rotr(b ^ c, 7);
+    return { a, b, c, d };
+}
+//# sourceMappingURL=_blake.js.map
+
+/**
+ * Internal Merkle-Damgard hash utils.
+ * @module
+ */
+/** Polyfill for Safari 14. https://caniuse.com/mdn-javascript_builtins_dataview_setbiguint64 */
+function setBigUint64(view, byteOffset, value, isLE) {
+    if (typeof view.setBigUint64 === 'function')
+        return view.setBigUint64(byteOffset, value, isLE);
+    const _32n = BigInt(32);
+    const _u32_max = BigInt(0xffffffff);
+    const wh = Number((value >> _32n) & _u32_max);
+    const wl = Number(value & _u32_max);
+    const h = isLE ? 4 : 0;
+    const l = isLE ? 0 : 4;
+    view.setUint32(byteOffset + h, wh, isLE);
+    view.setUint32(byteOffset + l, wl, isLE);
+}
+/** Choice: a ? b : c */
+function Chi(a, b, c) {
+    return (a & b) ^ (~a & c);
+}
+/** Majority function, true if any two inputs is true. */
+function Maj(a, b, c) {
+    return (a & b) ^ (a & c) ^ (b & c);
+}
+/**
+ * Merkle-Damgard hash construction base class.
+ * Could be used to create MD5, RIPEMD, SHA1, SHA2.
+ */
+class HashMD extends Hash {
+    constructor(blockLen, outputLen, padOffset, isLE) {
+        super();
+        this.finished = false;
+        this.length = 0;
+        this.pos = 0;
+        this.destroyed = false;
+        this.blockLen = blockLen;
+        this.outputLen = outputLen;
+        this.padOffset = padOffset;
+        this.isLE = isLE;
+        this.buffer = new Uint8Array(blockLen);
+        this.view = createView(this.buffer);
+    }
+    update(data) {
+        aexists(this);
+        data = toBytes(data);
+        abytes(data);
+        const { view, buffer, blockLen } = this;
+        const len = data.length;
+        for (let pos = 0; pos < len;) {
+            const take = Math.min(blockLen - this.pos, len - pos);
+            // Fast path: we have at least one block in input, cast it to view and process
+            if (take === blockLen) {
+                const dataView = createView(data);
+                for (; blockLen <= len - pos; pos += blockLen)
+                    this.process(dataView, pos);
+                continue;
+            }
+            buffer.set(data.subarray(pos, pos + take), this.pos);
+            this.pos += take;
+            pos += take;
+            if (this.pos === blockLen) {
+                this.process(view, 0);
+                this.pos = 0;
+            }
+        }
+        this.length += data.length;
+        this.roundClean();
+        return this;
+    }
+    digestInto(out) {
+        aexists(this);
+        aoutput(out, this);
+        this.finished = true;
+        // Padding
+        // We can avoid allocation of buffer for padding completely if it
+        // was previously not allocated here. But it won't change performance.
+        const { buffer, view, blockLen, isLE } = this;
+        let { pos } = this;
+        // append the bit '1' to the message
+        buffer[pos++] = 0b10000000;
+        clean(this.buffer.subarray(pos));
+        // we have less than padOffset left in buffer, so we cannot put length in
+        // current block, need process it and pad again
+        if (this.padOffset > blockLen - pos) {
+            this.process(view, 0);
+            pos = 0;
+        }
+        // Pad until full block byte with zeros
+        for (let i = pos; i < blockLen; i++)
+            buffer[i] = 0;
+        // Note: sha512 requires length to be 128bit integer, but length in JS will overflow before that
+        // You need to write around 2 exabytes (u64_max / 8 / (1024**6)) for this to happen.
+        // So we just write lowest 64 bits of that value.
+        setBigUint64(view, blockLen - 8, BigInt(this.length * 8), isLE);
+        this.process(view, 0);
+        const oview = createView(out);
+        const len = this.outputLen;
+        // NOTE: we do division by 4 later, which should be fused in single op with modulo by JIT
+        if (len % 4)
+            throw new Error('_sha2: outputLen should be aligned to 32bit');
+        const outLen = len / 4;
+        const state = this.get();
+        if (outLen > state.length)
+            throw new Error('_sha2: outputLen bigger than state');
+        for (let i = 0; i < outLen; i++)
+            oview.setUint32(4 * i, state[i], isLE);
+    }
+    digest() {
+        const { buffer, outputLen } = this;
+        this.digestInto(buffer);
+        const res = buffer.slice(0, outputLen);
+        this.destroy();
+        return res;
+    }
+    _cloneInto(to) {
+        to || (to = new this.constructor());
+        to.set(...this.get());
+        const { blockLen, buffer, length, finished, destroyed, pos } = this;
+        to.destroyed = destroyed;
+        to.finished = finished;
+        to.length = length;
+        to.pos = pos;
+        if (length % blockLen)
+            to.buffer.set(buffer);
+        return to;
+    }
+    clone() {
+        return this._cloneInto();
+    }
+}
+/**
+ * Initial SHA-2 state: fractional parts of square roots of first 16 primes 2..53.
+ * Check out `test/misc/sha2-gen-iv.js` for recomputation guide.
+ */
+/** Initial SHA256 state. Bits 0..32 of frac part of sqrt of primes 2..19 */
+const SHA256_IV = /* @__PURE__ */ Uint32Array.from([
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+]);
+/** Initial SHA224 state. Bits 32..64 of frac part of sqrt of primes 23..53 */
+const SHA224_IV = /* @__PURE__ */ Uint32Array.from([
+    0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939, 0xffc00b31, 0x68581511, 0x64f98fa7, 0xbefa4fa4,
+]);
+/** Initial SHA384 state. Bits 0..64 of frac part of sqrt of primes 23..53 */
+const SHA384_IV = /* @__PURE__ */ Uint32Array.from([
+    0xcbbb9d5d, 0xc1059ed8, 0x629a292a, 0x367cd507, 0x9159015a, 0x3070dd17, 0x152fecd8, 0xf70e5939,
+    0x67332667, 0xffc00b31, 0x8eb44a87, 0x68581511, 0xdb0c2e0d, 0x64f98fa7, 0x47b5481d, 0xbefa4fa4,
+]);
+/** Initial SHA512 state. Bits 0..64 of frac part of sqrt of primes 2..19 */
+const SHA512_IV = /* @__PURE__ */ Uint32Array.from([
+    0x6a09e667, 0xf3bcc908, 0xbb67ae85, 0x84caa73b, 0x3c6ef372, 0xfe94f82b, 0xa54ff53a, 0x5f1d36f1,
+    0x510e527f, 0xade682d1, 0x9b05688c, 0x2b3e6c1f, 0x1f83d9ab, 0xfb41bd6b, 0x5be0cd19, 0x137e2179,
+]);
+//# sourceMappingURL=_md.js.map
+
+/**
+ * Internal helpers for u64. BigUint64Array is too slow as per 2025, so we implement it using Uint32Array.
+ * @todo re-check https://issues.chromium.org/issues/42212588
+ * @module
+ */
+const U32_MASK64 = /* @__PURE__ */ BigInt(2 ** 32 - 1);
+const _32n = /* @__PURE__ */ BigInt(32);
+function fromBig(n, le = false) {
+    if (le)
+        return { h: Number(n & U32_MASK64), l: Number((n >> _32n) & U32_MASK64) };
+    return { h: Number((n >> _32n) & U32_MASK64) | 0, l: Number(n & U32_MASK64) | 0 };
+}
+function split(lst, le = false) {
+    const len = lst.length;
+    let Ah = new Uint32Array(len);
+    let Al = new Uint32Array(len);
+    for (let i = 0; i < len; i++) {
+        const { h, l } = fromBig(lst[i], le);
+        [Ah[i], Al[i]] = [h, l];
+    }
+    return [Ah, Al];
+}
+const toBig = (h, l) => (BigInt(h >>> 0) << _32n) | BigInt(l >>> 0);
+// for Shift in [0, 32)
+const shrSH = (h, _l, s) => h >>> s;
+const shrSL = (h, l, s) => (h << (32 - s)) | (l >>> s);
+// Right rotate for Shift in [1, 32)
+const rotrSH = (h, l, s) => (h >>> s) | (l << (32 - s));
+const rotrSL = (h, l, s) => (h << (32 - s)) | (l >>> s);
+// Right rotate for Shift in (32, 64), NOTE: 32 is special case.
+const rotrBH = (h, l, s) => (h << (64 - s)) | (l >>> (s - 32));
+const rotrBL = (h, l, s) => (h >>> (s - 32)) | (l << (64 - s));
+// Right rotate for shift===32 (just swaps l&h)
+const rotr32H = (_h, l) => l;
+const rotr32L = (h, _l) => h;
+// Left rotate for Shift in [1, 32)
+const rotlSH = (h, l, s) => (h << s) | (l >>> (32 - s));
+const rotlSL = (h, l, s) => (l << s) | (h >>> (32 - s));
+// Left rotate for Shift in (32, 64), NOTE: 32 is special case.
+const rotlBH = (h, l, s) => (l << (s - 32)) | (h >>> (64 - s));
+const rotlBL = (h, l, s) => (h << (s - 32)) | (l >>> (64 - s));
+// JS uses 32-bit signed integers for bitwise operations which means we cannot
+// simple take carry out of low bit sum by shift, we need to use division.
+function add(Ah, Al, Bh, Bl) {
+    const l = (Al >>> 0) + (Bl >>> 0);
+    return { h: (Ah + Bh + ((l / 2 ** 32) | 0)) | 0, l: l | 0 };
+}
+// Addition with more than 2 elements
+const add3L = (Al, Bl, Cl) => (Al >>> 0) + (Bl >>> 0) + (Cl >>> 0);
+const add3H = (low, Ah, Bh, Ch) => (Ah + Bh + Ch + ((low / 2 ** 32) | 0)) | 0;
+const add4L = (Al, Bl, Cl, Dl) => (Al >>> 0) + (Bl >>> 0) + (Cl >>> 0) + (Dl >>> 0);
+const add4H = (low, Ah, Bh, Ch, Dh) => (Ah + Bh + Ch + Dh + ((low / 2 ** 32) | 0)) | 0;
+const add5L = (Al, Bl, Cl, Dl, El) => (Al >>> 0) + (Bl >>> 0) + (Cl >>> 0) + (Dl >>> 0) + (El >>> 0);
+const add5H = (low, Ah, Bh, Ch, Dh, Eh) => (Ah + Bh + Ch + Dh + Eh + ((low / 2 ** 32) | 0)) | 0;
+// prettier-ignore
+// prettier-ignore
+const u64 = {
+    fromBig, split, toBig,
+    shrSH, shrSL,
+    rotrSH, rotrSL, rotrBH, rotrBL,
+    rotr32H, rotr32L,
+    rotlSH, rotlSL, rotlBH, rotlBL,
+    add, add3L, add3H, add4L, add4H, add5H, add5L,
+};
+//# sourceMappingURL=_u64.js.map
+
+/**
+ * blake2b (64-bit) & blake2s (8 to 32-bit) hash functions.
+ * b could have been faster, but there is no fast u64 in js, so s is 1.5x faster.
+ * @module
+ */
+// prettier-ignore
+// Same as SHA512_IV, but swapped endianness: LE instead of BE. iv[1] is iv[0], etc.
+const B2B_IV = /* @__PURE__ */ Uint32Array.from([
+    0xf3bcc908, 0x6a09e667, 0x84caa73b, 0xbb67ae85, 0xfe94f82b, 0x3c6ef372, 0x5f1d36f1, 0xa54ff53a,
+    0xade682d1, 0x510e527f, 0x2b3e6c1f, 0x9b05688c, 0xfb41bd6b, 0x1f83d9ab, 0x137e2179, 0x5be0cd19,
+]);
+// Temporary buffer
+const BBUF = /* @__PURE__ */ new Uint32Array(32);
+// Mixing function G splitted in two halfs
+function G1b(a, b, c, d, msg, x) {
+    // NOTE: V is LE here
+    const Xl = msg[x], Xh = msg[x + 1]; // prettier-ignore
+    let Al = BBUF[2 * a], Ah = BBUF[2 * a + 1]; // prettier-ignore
+    let Bl = BBUF[2 * b], Bh = BBUF[2 * b + 1]; // prettier-ignore
+    let Cl = BBUF[2 * c], Ch = BBUF[2 * c + 1]; // prettier-ignore
+    let Dl = BBUF[2 * d], Dh = BBUF[2 * d + 1]; // prettier-ignore
+    // v[a] = (v[a] + v[b] + x) | 0;
+    let ll = u64.add3L(Al, Bl, Xl);
+    Ah = u64.add3H(ll, Ah, Bh, Xh);
+    Al = ll | 0;
+    // v[d] = rotr(v[d] ^ v[a], 32)
+    ({ Dh, Dl } = { Dh: Dh ^ Ah, Dl: Dl ^ Al });
+    ({ Dh, Dl } = { Dh: u64.rotr32H(Dh, Dl), Dl: u64.rotr32L(Dh, Dl) });
+    // v[c] = (v[c] + v[d]) | 0;
+    ({ h: Ch, l: Cl } = u64.add(Ch, Cl, Dh, Dl));
+    // v[b] = rotr(v[b] ^ v[c], 24)
+    ({ Bh, Bl } = { Bh: Bh ^ Ch, Bl: Bl ^ Cl });
+    ({ Bh, Bl } = { Bh: u64.rotrSH(Bh, Bl, 24), Bl: u64.rotrSL(Bh, Bl, 24) });
+    (BBUF[2 * a] = Al), (BBUF[2 * a + 1] = Ah);
+    (BBUF[2 * b] = Bl), (BBUF[2 * b + 1] = Bh);
+    (BBUF[2 * c] = Cl), (BBUF[2 * c + 1] = Ch);
+    (BBUF[2 * d] = Dl), (BBUF[2 * d + 1] = Dh);
+}
+function G2b(a, b, c, d, msg, x) {
+    // NOTE: V is LE here
+    const Xl = msg[x], Xh = msg[x + 1]; // prettier-ignore
+    let Al = BBUF[2 * a], Ah = BBUF[2 * a + 1]; // prettier-ignore
+    let Bl = BBUF[2 * b], Bh = BBUF[2 * b + 1]; // prettier-ignore
+    let Cl = BBUF[2 * c], Ch = BBUF[2 * c + 1]; // prettier-ignore
+    let Dl = BBUF[2 * d], Dh = BBUF[2 * d + 1]; // prettier-ignore
+    // v[a] = (v[a] + v[b] + x) | 0;
+    let ll = u64.add3L(Al, Bl, Xl);
+    Ah = u64.add3H(ll, Ah, Bh, Xh);
+    Al = ll | 0;
+    // v[d] = rotr(v[d] ^ v[a], 16)
+    ({ Dh, Dl } = { Dh: Dh ^ Ah, Dl: Dl ^ Al });
+    ({ Dh, Dl } = { Dh: u64.rotrSH(Dh, Dl, 16), Dl: u64.rotrSL(Dh, Dl, 16) });
+    // v[c] = (v[c] + v[d]) | 0;
+    ({ h: Ch, l: Cl } = u64.add(Ch, Cl, Dh, Dl));
+    // v[b] = rotr(v[b] ^ v[c], 63)
+    ({ Bh, Bl } = { Bh: Bh ^ Ch, Bl: Bl ^ Cl });
+    ({ Bh, Bl } = { Bh: u64.rotrBH(Bh, Bl, 63), Bl: u64.rotrBL(Bh, Bl, 63) });
+    (BBUF[2 * a] = Al), (BBUF[2 * a + 1] = Ah);
+    (BBUF[2 * b] = Bl), (BBUF[2 * b + 1] = Bh);
+    (BBUF[2 * c] = Cl), (BBUF[2 * c + 1] = Ch);
+    (BBUF[2 * d] = Dl), (BBUF[2 * d + 1] = Dh);
+}
+function checkBlake2Opts(outputLen, opts = {}, keyLen, saltLen, persLen) {
+    anumber(keyLen);
+    if (outputLen < 0 || outputLen > keyLen)
+        throw new Error('outputLen bigger than keyLen');
+    const { key, salt, personalization } = opts;
+    if (key !== undefined && (key.length < 1 || key.length > keyLen))
+        throw new Error('key length must be undefined or 1..' + keyLen);
+    if (salt !== undefined && salt.length !== saltLen)
+        throw new Error('salt must be undefined or ' + saltLen);
+    if (personalization !== undefined && personalization.length !== persLen)
+        throw new Error('personalization must be undefined or ' + persLen);
+}
+/** Class, from which others are subclassed. */
+class BLAKE2 extends Hash {
+    constructor(blockLen, outputLen) {
+        super();
+        this.finished = false;
+        this.destroyed = false;
+        this.length = 0;
+        this.pos = 0;
+        anumber(blockLen);
+        anumber(outputLen);
+        this.blockLen = blockLen;
+        this.outputLen = outputLen;
+        this.buffer = new Uint8Array(blockLen);
+        this.buffer32 = u32(this.buffer);
+    }
+    update(data) {
+        aexists(this);
+        data = toBytes(data);
+        abytes(data);
+        // Main difference with other hashes: there is flag for last block,
+        // so we cannot process current block before we know that there
+        // is the next one. This significantly complicates logic and reduces ability
+        // to do zero-copy processing
+        const { blockLen, buffer, buffer32 } = this;
+        const len = data.length;
+        const offset = data.byteOffset;
+        const buf = data.buffer;
+        for (let pos = 0; pos < len;) {
+            // If buffer is full and we still have input (don't process last block, same as blake2s)
+            if (this.pos === blockLen) {
+                swap32IfBE(buffer32);
+                this.compress(buffer32, 0, false);
+                swap32IfBE(buffer32);
+                this.pos = 0;
+            }
+            const take = Math.min(blockLen - this.pos, len - pos);
+            const dataOffset = offset + pos;
+            // full block && aligned to 4 bytes && not last in input
+            if (take === blockLen && !(dataOffset % 4) && pos + take < len) {
+                const data32 = new Uint32Array(buf, dataOffset, Math.floor((len - pos) / 4));
+                swap32IfBE(data32);
+                for (let pos32 = 0; pos + blockLen < len; pos32 += buffer32.length, pos += blockLen) {
+                    this.length += blockLen;
+                    this.compress(data32, pos32, false);
+                }
+                swap32IfBE(data32);
+                continue;
+            }
+            buffer.set(data.subarray(pos, pos + take), this.pos);
+            this.pos += take;
+            this.length += take;
+            pos += take;
+        }
+        return this;
+    }
+    digestInto(out) {
+        aexists(this);
+        aoutput(out, this);
+        const { pos, buffer32 } = this;
+        this.finished = true;
+        // Padding
+        clean(this.buffer.subarray(pos));
+        swap32IfBE(buffer32);
+        this.compress(buffer32, 0, true);
+        swap32IfBE(buffer32);
+        const out32 = u32(out);
+        this.get().forEach((v, i) => (out32[i] = swap8IfBE(v)));
+    }
+    digest() {
+        const { buffer, outputLen } = this;
+        this.digestInto(buffer);
+        const res = buffer.slice(0, outputLen);
+        this.destroy();
+        return res;
+    }
+    _cloneInto(to) {
+        const { buffer, length, finished, destroyed, outputLen, pos } = this;
+        to || (to = new this.constructor({ dkLen: outputLen }));
+        to.set(...this.get());
+        to.buffer.set(buffer);
+        to.destroyed = destroyed;
+        to.finished = finished;
+        to.length = length;
+        to.pos = pos;
+        // @ts-ignore
+        to.outputLen = outputLen;
+        return to;
+    }
+    clone() {
+        return this._cloneInto();
+    }
+}
+class BLAKE2b extends BLAKE2 {
+    constructor(opts = {}) {
+        const olen = opts.dkLen === undefined ? 64 : opts.dkLen;
+        super(128, olen);
+        // Same as SHA-512, but LE
+        this.v0l = B2B_IV[0] | 0;
+        this.v0h = B2B_IV[1] | 0;
+        this.v1l = B2B_IV[2] | 0;
+        this.v1h = B2B_IV[3] | 0;
+        this.v2l = B2B_IV[4] | 0;
+        this.v2h = B2B_IV[5] | 0;
+        this.v3l = B2B_IV[6] | 0;
+        this.v3h = B2B_IV[7] | 0;
+        this.v4l = B2B_IV[8] | 0;
+        this.v4h = B2B_IV[9] | 0;
+        this.v5l = B2B_IV[10] | 0;
+        this.v5h = B2B_IV[11] | 0;
+        this.v6l = B2B_IV[12] | 0;
+        this.v6h = B2B_IV[13] | 0;
+        this.v7l = B2B_IV[14] | 0;
+        this.v7h = B2B_IV[15] | 0;
+        checkBlake2Opts(olen, opts, 64, 16, 16);
+        let { key, personalization, salt } = opts;
+        let keyLength = 0;
+        if (key !== undefined) {
+            key = toBytes(key);
+            keyLength = key.length;
+        }
+        this.v0l ^= this.outputLen | (keyLength << 8) | (0x01 << 16) | (0x01 << 24);
+        if (salt !== undefined) {
+            salt = toBytes(salt);
+            const slt = u32(salt);
+            this.v4l ^= swap8IfBE(slt[0]);
+            this.v4h ^= swap8IfBE(slt[1]);
+            this.v5l ^= swap8IfBE(slt[2]);
+            this.v5h ^= swap8IfBE(slt[3]);
+        }
+        if (personalization !== undefined) {
+            personalization = toBytes(personalization);
+            const pers = u32(personalization);
+            this.v6l ^= swap8IfBE(pers[0]);
+            this.v6h ^= swap8IfBE(pers[1]);
+            this.v7l ^= swap8IfBE(pers[2]);
+            this.v7h ^= swap8IfBE(pers[3]);
+        }
+        if (key !== undefined) {
+            // Pad to blockLen and update
+            const tmp = new Uint8Array(this.blockLen);
+            tmp.set(key);
+            this.update(tmp);
+        }
+    }
+    // prettier-ignore
+    get() {
+        let { v0l, v0h, v1l, v1h, v2l, v2h, v3l, v3h, v4l, v4h, v5l, v5h, v6l, v6h, v7l, v7h } = this;
+        return [v0l, v0h, v1l, v1h, v2l, v2h, v3l, v3h, v4l, v4h, v5l, v5h, v6l, v6h, v7l, v7h];
+    }
+    // prettier-ignore
+    set(v0l, v0h, v1l, v1h, v2l, v2h, v3l, v3h, v4l, v4h, v5l, v5h, v6l, v6h, v7l, v7h) {
+        this.v0l = v0l | 0;
+        this.v0h = v0h | 0;
+        this.v1l = v1l | 0;
+        this.v1h = v1h | 0;
+        this.v2l = v2l | 0;
+        this.v2h = v2h | 0;
+        this.v3l = v3l | 0;
+        this.v3h = v3h | 0;
+        this.v4l = v4l | 0;
+        this.v4h = v4h | 0;
+        this.v5l = v5l | 0;
+        this.v5h = v5h | 0;
+        this.v6l = v6l | 0;
+        this.v6h = v6h | 0;
+        this.v7l = v7l | 0;
+        this.v7h = v7h | 0;
+    }
+    compress(msg, offset, isLast) {
+        this.get().forEach((v, i) => (BBUF[i] = v)); // First half from state.
+        BBUF.set(B2B_IV, 16); // Second half from IV.
+        let { h, l } = u64.fromBig(BigInt(this.length));
+        BBUF[24] = B2B_IV[8] ^ l; // Low word of the offset.
+        BBUF[25] = B2B_IV[9] ^ h; // High word.
+        // Invert all bits for last block
+        if (isLast) {
+            BBUF[28] = ~BBUF[28];
+            BBUF[29] = ~BBUF[29];
+        }
+        let j = 0;
+        const s = BSIGMA;
+        for (let i = 0; i < 12; i++) {
+            G1b(0, 4, 8, 12, msg, offset + 2 * s[j++]);
+            G2b(0, 4, 8, 12, msg, offset + 2 * s[j++]);
+            G1b(1, 5, 9, 13, msg, offset + 2 * s[j++]);
+            G2b(1, 5, 9, 13, msg, offset + 2 * s[j++]);
+            G1b(2, 6, 10, 14, msg, offset + 2 * s[j++]);
+            G2b(2, 6, 10, 14, msg, offset + 2 * s[j++]);
+            G1b(3, 7, 11, 15, msg, offset + 2 * s[j++]);
+            G2b(3, 7, 11, 15, msg, offset + 2 * s[j++]);
+            G1b(0, 5, 10, 15, msg, offset + 2 * s[j++]);
+            G2b(0, 5, 10, 15, msg, offset + 2 * s[j++]);
+            G1b(1, 6, 11, 12, msg, offset + 2 * s[j++]);
+            G2b(1, 6, 11, 12, msg, offset + 2 * s[j++]);
+            G1b(2, 7, 8, 13, msg, offset + 2 * s[j++]);
+            G2b(2, 7, 8, 13, msg, offset + 2 * s[j++]);
+            G1b(3, 4, 9, 14, msg, offset + 2 * s[j++]);
+            G2b(3, 4, 9, 14, msg, offset + 2 * s[j++]);
+        }
+        this.v0l ^= BBUF[0] ^ BBUF[16];
+        this.v0h ^= BBUF[1] ^ BBUF[17];
+        this.v1l ^= BBUF[2] ^ BBUF[18];
+        this.v1h ^= BBUF[3] ^ BBUF[19];
+        this.v2l ^= BBUF[4] ^ BBUF[20];
+        this.v2h ^= BBUF[5] ^ BBUF[21];
+        this.v3l ^= BBUF[6] ^ BBUF[22];
+        this.v3h ^= BBUF[7] ^ BBUF[23];
+        this.v4l ^= BBUF[8] ^ BBUF[24];
+        this.v4h ^= BBUF[9] ^ BBUF[25];
+        this.v5l ^= BBUF[10] ^ BBUF[26];
+        this.v5h ^= BBUF[11] ^ BBUF[27];
+        this.v6l ^= BBUF[12] ^ BBUF[28];
+        this.v6h ^= BBUF[13] ^ BBUF[29];
+        this.v7l ^= BBUF[14] ^ BBUF[30];
+        this.v7h ^= BBUF[15] ^ BBUF[31];
+        clean(BBUF);
+    }
+    destroy() {
+        this.destroyed = true;
+        clean(this.buffer32);
+        this.set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    }
+}
+/**
+ * Blake2b hash function. 64-bit. 1.5x slower than blake2s in JS.
+ * @param msg - message that would be hashed
+ * @param opts - dkLen output length, key for MAC mode, salt, personalization
+ */
+const blake2b = /* @__PURE__ */ createOptHasher((opts) => new BLAKE2b(opts));
+// prettier-ignore
+function compress(s, offset, msg, rounds, v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15) {
+    let j = 0;
+    for (let i = 0; i < rounds; i++) {
+        ({ a: v0, b: v4, c: v8, d: v12 } = G1s(v0, v4, v8, v12, msg[offset + s[j++]]));
+        ({ a: v0, b: v4, c: v8, d: v12 } = G2s(v0, v4, v8, v12, msg[offset + s[j++]]));
+        ({ a: v1, b: v5, c: v9, d: v13 } = G1s(v1, v5, v9, v13, msg[offset + s[j++]]));
+        ({ a: v1, b: v5, c: v9, d: v13 } = G2s(v1, v5, v9, v13, msg[offset + s[j++]]));
+        ({ a: v2, b: v6, c: v10, d: v14 } = G1s(v2, v6, v10, v14, msg[offset + s[j++]]));
+        ({ a: v2, b: v6, c: v10, d: v14 } = G2s(v2, v6, v10, v14, msg[offset + s[j++]]));
+        ({ a: v3, b: v7, c: v11, d: v15 } = G1s(v3, v7, v11, v15, msg[offset + s[j++]]));
+        ({ a: v3, b: v7, c: v11, d: v15 } = G2s(v3, v7, v11, v15, msg[offset + s[j++]]));
+        ({ a: v0, b: v5, c: v10, d: v15 } = G1s(v0, v5, v10, v15, msg[offset + s[j++]]));
+        ({ a: v0, b: v5, c: v10, d: v15 } = G2s(v0, v5, v10, v15, msg[offset + s[j++]]));
+        ({ a: v1, b: v6, c: v11, d: v12 } = G1s(v1, v6, v11, v12, msg[offset + s[j++]]));
+        ({ a: v1, b: v6, c: v11, d: v12 } = G2s(v1, v6, v11, v12, msg[offset + s[j++]]));
+        ({ a: v2, b: v7, c: v8, d: v13 } = G1s(v2, v7, v8, v13, msg[offset + s[j++]]));
+        ({ a: v2, b: v7, c: v8, d: v13 } = G2s(v2, v7, v8, v13, msg[offset + s[j++]]));
+        ({ a: v3, b: v4, c: v9, d: v14 } = G1s(v3, v4, v9, v14, msg[offset + s[j++]]));
+        ({ a: v3, b: v4, c: v9, d: v14 } = G2s(v3, v4, v9, v14, msg[offset + s[j++]]));
+    }
+    return { v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15 };
+}
+const B2S_IV = SHA256_IV;
+class BLAKE2s extends BLAKE2 {
+    constructor(opts = {}) {
+        const olen = opts.dkLen === undefined ? 32 : opts.dkLen;
+        super(64, olen);
+        // Internal state, same as SHA-256
+        this.v0 = B2S_IV[0] | 0;
+        this.v1 = B2S_IV[1] | 0;
+        this.v2 = B2S_IV[2] | 0;
+        this.v3 = B2S_IV[3] | 0;
+        this.v4 = B2S_IV[4] | 0;
+        this.v5 = B2S_IV[5] | 0;
+        this.v6 = B2S_IV[6] | 0;
+        this.v7 = B2S_IV[7] | 0;
+        checkBlake2Opts(olen, opts, 32, 8, 8);
+        let { key, personalization, salt } = opts;
+        let keyLength = 0;
+        if (key !== undefined) {
+            key = toBytes(key);
+            keyLength = key.length;
+        }
+        this.v0 ^= this.outputLen | (keyLength << 8) | (0x01 << 16) | (0x01 << 24);
+        if (salt !== undefined) {
+            salt = toBytes(salt);
+            const slt = u32(salt);
+            this.v4 ^= swap8IfBE(slt[0]);
+            this.v5 ^= swap8IfBE(slt[1]);
+        }
+        if (personalization !== undefined) {
+            personalization = toBytes(personalization);
+            const pers = u32(personalization);
+            this.v6 ^= swap8IfBE(pers[0]);
+            this.v7 ^= swap8IfBE(pers[1]);
+        }
+        if (key !== undefined) {
+            // Pad to blockLen and update
+            abytes(key);
+            const tmp = new Uint8Array(this.blockLen);
+            tmp.set(key);
+            this.update(tmp);
+        }
+    }
+    get() {
+        const { v0, v1, v2, v3, v4, v5, v6, v7 } = this;
+        return [v0, v1, v2, v3, v4, v5, v6, v7];
+    }
+    // prettier-ignore
+    set(v0, v1, v2, v3, v4, v5, v6, v7) {
+        this.v0 = v0 | 0;
+        this.v1 = v1 | 0;
+        this.v2 = v2 | 0;
+        this.v3 = v3 | 0;
+        this.v4 = v4 | 0;
+        this.v5 = v5 | 0;
+        this.v6 = v6 | 0;
+        this.v7 = v7 | 0;
+    }
+    compress(msg, offset, isLast) {
+        const { h, l } = u64.fromBig(BigInt(this.length));
+        // prettier-ignore
+        const { v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15 } = compress(BSIGMA, offset, msg, 10, this.v0, this.v1, this.v2, this.v3, this.v4, this.v5, this.v6, this.v7, B2S_IV[0], B2S_IV[1], B2S_IV[2], B2S_IV[3], l ^ B2S_IV[4], h ^ B2S_IV[5], isLast ? ~B2S_IV[6] : B2S_IV[6], B2S_IV[7]);
+        this.v0 ^= v0 ^ v8;
+        this.v1 ^= v1 ^ v9;
+        this.v2 ^= v2 ^ v10;
+        this.v3 ^= v3 ^ v11;
+        this.v4 ^= v4 ^ v12;
+        this.v5 ^= v5 ^ v13;
+        this.v6 ^= v6 ^ v14;
+        this.v7 ^= v7 ^ v15;
+    }
+    destroy() {
+        this.destroyed = true;
+        clean(this.buffer32);
+        this.set(0, 0, 0, 0, 0, 0, 0, 0);
+    }
+}
+/**
+ * Blake2s hash function. Focuses on 8-bit to 32-bit platforms. 1.5x faster than blake2b in JS.
+ * @param msg - message that would be hashed
+ * @param opts - dkLen output length, key for MAC mode, salt, personalization
+ */
+const blake2s = /* @__PURE__ */ createOptHasher((opts) => new BLAKE2s(opts));
+//# sourceMappingURL=blake2.js.map
+
+/**
+ * Argon2 KDF from RFC 9106. Can be used to create a key from password and salt.
+ * We suggest to use Scrypt. JS Argon is 2-10x slower than native code because of 64-bitness:
+ * * argon uses uint64, but JS doesn't have fast uint64array
+ * * uint64 multiplication is 1/3 of time
+ * * `P` function would be very nice with u64, because most of value will be in registers,
+ *   hovewer with u32 it will require 32 registers, which is too much.
+ * * JS arrays do slow bound checks, so reading from `A2_BUF` slows it down
+ * @module
+ */
+const AT = { Argond2d: 0, Argon2i: 1, Argon2id: 2 };
+const ARGON2_SYNC_POINTS = 4;
+const abytesOrZero = (buf) => {
+    if (buf === undefined)
+        return Uint8Array.of();
+    return kdfInputToBytes(buf);
+};
+// u32 * u32 = u64
+function mul(a, b) {
+    const aL = a & 0xffff;
+    const aH = a >>> 16;
+    const bL = b & 0xffff;
+    const bH = b >>> 16;
+    const ll = Math.imul(aL, bL);
+    const hl = Math.imul(aH, bL);
+    const lh = Math.imul(aL, bH);
+    const hh = Math.imul(aH, bH);
+    const carry = (ll >>> 16) + (hl & 0xffff) + lh;
+    const high = (hh + (hl >>> 16) + (carry >>> 16)) | 0;
+    const low = (carry << 16) | (ll & 0xffff);
+    return { h: high, l: low };
+}
+function mul2(a, b) {
+    // 2 * a * b (via shifts)
+    const { h, l } = mul(a, b);
+    return { h: ((h << 1) | (l >>> 31)) & 4294967295, l: (l << 1) & 4294967295 };
+}
+// BlaMka permutation for Argon2
+// A + B + (2 * u32(A) * u32(B))
+function blamka(Ah, Al, Bh, Bl) {
+    const { h: Ch, l: Cl } = mul2(Al, Bl);
+    // A + B + (2 * A * B)
+    const Rll = add3L(Al, Bl, Cl);
+    return { h: add3H(Rll, Ah, Bh, Ch), l: Rll | 0 };
+}
+// Temporary block buffer
+const A2_BUF = new Uint32Array(256); // 1024 bytes (matrix 16x16)
+function G(a, b, c, d) {
+    let Al = A2_BUF[2 * a], Ah = A2_BUF[2 * a + 1]; // prettier-ignore
+    let Bl = A2_BUF[2 * b], Bh = A2_BUF[2 * b + 1]; // prettier-ignore
+    let Cl = A2_BUF[2 * c], Ch = A2_BUF[2 * c + 1]; // prettier-ignore
+    let Dl = A2_BUF[2 * d], Dh = A2_BUF[2 * d + 1]; // prettier-ignore
+    ({ h: Ah, l: Al } = blamka(Ah, Al, Bh, Bl));
+    ({ Dh, Dl } = { Dh: Dh ^ Ah, Dl: Dl ^ Al });
+    ({ Dh, Dl } = { Dh: rotr32H(Dh, Dl), Dl: rotr32L(Dh, Dl) });
+    ({ h: Ch, l: Cl } = blamka(Ch, Cl, Dh, Dl));
+    ({ Bh, Bl } = { Bh: Bh ^ Ch, Bl: Bl ^ Cl });
+    ({ Bh, Bl } = { Bh: rotrSH(Bh, Bl, 24), Bl: rotrSL(Bh, Bl, 24) });
+    ({ h: Ah, l: Al } = blamka(Ah, Al, Bh, Bl));
+    ({ Dh, Dl } = { Dh: Dh ^ Ah, Dl: Dl ^ Al });
+    ({ Dh, Dl } = { Dh: rotrSH(Dh, Dl, 16), Dl: rotrSL(Dh, Dl, 16) });
+    ({ h: Ch, l: Cl } = blamka(Ch, Cl, Dh, Dl));
+    ({ Bh, Bl } = { Bh: Bh ^ Ch, Bl: Bl ^ Cl });
+    ({ Bh, Bl } = { Bh: rotrBH(Bh, Bl, 63), Bl: rotrBL(Bh, Bl, 63) });
+    (A2_BUF[2 * a] = Al), (A2_BUF[2 * a + 1] = Ah);
+    (A2_BUF[2 * b] = Bl), (A2_BUF[2 * b + 1] = Bh);
+    (A2_BUF[2 * c] = Cl), (A2_BUF[2 * c + 1] = Ch);
+    (A2_BUF[2 * d] = Dl), (A2_BUF[2 * d + 1] = Dh);
+}
+// prettier-ignore
+function P(v00, v01, v02, v03, v04, v05, v06, v07, v08, v09, v10, v11, v12, v13, v14, v15) {
+    G(v00, v04, v08, v12);
+    G(v01, v05, v09, v13);
+    G(v02, v06, v10, v14);
+    G(v03, v07, v11, v15);
+    G(v00, v05, v10, v15);
+    G(v01, v06, v11, v12);
+    G(v02, v07, v08, v13);
+    G(v03, v04, v09, v14);
+}
+function block(x, xPos, yPos, outPos, needXor) {
+    for (let i = 0; i < 256; i++)
+        A2_BUF[i] = x[xPos + i] ^ x[yPos + i];
+    // columns (8)
+    for (let i = 0; i < 128; i += 16) {
+        // prettier-ignore
+        P(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8, i + 9, i + 10, i + 11, i + 12, i + 13, i + 14, i + 15);
+    }
+    // rows (8)
+    for (let i = 0; i < 16; i += 2) {
+        // prettier-ignore
+        P(i, i + 1, i + 16, i + 17, i + 32, i + 33, i + 48, i + 49, i + 64, i + 65, i + 80, i + 81, i + 96, i + 97, i + 112, i + 113);
+    }
+    if (needXor)
+        for (let i = 0; i < 256; i++)
+            x[outPos + i] ^= A2_BUF[i] ^ x[xPos + i] ^ x[yPos + i];
+    else
+        for (let i = 0; i < 256; i++)
+            x[outPos + i] = A2_BUF[i] ^ x[xPos + i] ^ x[yPos + i];
+    clean(A2_BUF);
+}
+// Variable-Length Hash Function H'
+function Hp(A, dkLen) {
+    const A8 = u8(A);
+    const T = new Uint32Array(1);
+    const T8 = u8(T);
+    T[0] = dkLen;
+    // Fast path
+    if (dkLen <= 64)
+        return blake2b.create({ dkLen }).update(T8).update(A8).digest();
+    const out = new Uint8Array(dkLen);
+    let V = blake2b.create({}).update(T8).update(A8).digest();
+    let pos = 0;
+    // First block
+    out.set(V.subarray(0, 32));
+    pos += 32;
+    // Rest blocks
+    for (; dkLen - pos > 64; pos += 32) {
+        const Vh = blake2b.create({}).update(V);
+        Vh.digestInto(V);
+        Vh.destroy();
+        out.set(V.subarray(0, 32), pos);
+    }
+    // Last block
+    out.set(blake2b(V, { dkLen: dkLen - pos }), pos);
+    clean(V, T);
+    return u32(out);
+}
+// Used only inside process block!
+function indexAlpha(r, s, laneLen, segmentLen, index, randL, sameLane = false) {
+    // This is ugly, but close enough to reference implementation.
+    let area;
+    if (r === 0) {
+        if (s === 0)
+            area = index - 1;
+        else if (sameLane)
+            area = s * segmentLen + index - 1;
+        else
+            area = s * segmentLen + (index == 0 ? -1 : 0);
+    }
+    else if (sameLane)
+        area = laneLen - segmentLen + index - 1;
+    else
+        area = laneLen - segmentLen + (index == 0 ? -1 : 0);
+    const startPos = r !== 0 && s !== ARGON2_SYNC_POINTS - 1 ? (s + 1) * segmentLen : 0;
+    const rel = area - 1 - mul(area, mul(randL, randL).h).h;
+    return (startPos + rel) % laneLen;
+}
+const maxUint32 = Math.pow(2, 32);
+function isU32(num) {
+    return Number.isSafeInteger(num) && num >= 0 && num < maxUint32;
+}
+function argon2Opts(opts) {
+    const merged = {
+        version: 0x13,
+        dkLen: 32,
+        maxmem: maxUint32 - 1,
+        asyncTick: 10,
+    };
+    for (let [k, v] of Object.entries(opts))
+        if (v != null)
+            merged[k] = v;
+    const { dkLen, p, m, t, version, onProgress } = merged;
+    if (!isU32(dkLen) || dkLen < 4)
+        throw new Error('dkLen should be at least 4 bytes');
+    if (!isU32(p) || p < 1 || p >= Math.pow(2, 24))
+        throw new Error('p should be 1 <= p < 2^24');
+    if (!isU32(m))
+        throw new Error('m should be 0 <= m < 2^32');
+    if (!isU32(t) || t < 1)
+        throw new Error('t (iterations) should be 1 <= t < 2^32');
+    if (onProgress !== undefined && typeof onProgress !== 'function')
+        throw new Error('progressCb should be function');
+    /*
+    Memory size m MUST be an integer number of kibibytes from 8*p to 2^(32)-1. The actual number of blocks is m', which is m rounded down to the nearest multiple of 4*p.
+    */
+    if (!isU32(m) || m < 8 * p)
+        throw new Error('memory should be at least 8*p bytes');
+    if (version !== 0x10 && version !== 0x13)
+        throw new Error('unknown version=' + version);
+    return merged;
+}
+function argon2Init(password, salt, type, opts) {
+    password = kdfInputToBytes(password);
+    salt = kdfInputToBytes(salt);
+    abytes(password);
+    abytes(salt);
+    if (!isU32(password.length))
+        throw new Error('password should be less than 4 GB');
+    if (!isU32(salt.length) || salt.length < 8)
+        throw new Error('salt should be at least 8 bytes and less than 4 GB');
+    if (!Object.values(AT).includes(type))
+        throw new Error('invalid type');
+    let { p, dkLen, m, t, version, key, personalization, maxmem, onProgress, asyncTick } = argon2Opts(opts);
+    // Validation
+    key = abytesOrZero(key);
+    personalization = abytesOrZero(personalization);
+    // H_0 = H^(64)(LE32(p) || LE32(T) || LE32(m) || LE32(t) ||
+    //       LE32(v) || LE32(y) || LE32(length(P)) || P ||
+    //       LE32(length(S)) || S ||  LE32(length(K)) || K ||
+    //       LE32(length(X)) || X)
+    const h = blake2b.create({});
+    const BUF = new Uint32Array(1);
+    const BUF8 = u8(BUF);
+    for (let item of [p, dkLen, m, t, version, type]) {
+        BUF[0] = item;
+        h.update(BUF8);
+    }
+    for (let i of [password, salt, key, personalization]) {
+        BUF[0] = i.length; // BUF is u32 array, this is valid
+        h.update(BUF8).update(i);
+    }
+    const H0 = new Uint32Array(18);
+    const H0_8 = u8(H0);
+    h.digestInto(H0_8);
+    // 256 u32 = 1024 (BLOCK_SIZE), fills A2_BUF on processing
+    // Params
+    const lanes = p;
+    // m' = 4 * p * floor (m / 4p)
+    const mP = 4 * p * Math.floor(m / (ARGON2_SYNC_POINTS * p));
+    //q = m' / p columns
+    const laneLen = Math.floor(mP / p);
+    const segmentLen = Math.floor(laneLen / ARGON2_SYNC_POINTS);
+    const memUsed = mP * 256;
+    if (!isU32(maxmem) || memUsed > maxmem)
+        throw new Error('mem should be less than 2**32, got: maxmem=' + maxmem + ', memused=' + memUsed);
+    const B = new Uint32Array(memUsed);
+    // Fill first blocks
+    for (let l = 0; l < p; l++) {
+        const i = 256 * laneLen * l;
+        // B[i][0] = H'^(1024)(H_0 || LE32(0) || LE32(i))
+        H0[17] = l;
+        H0[16] = 0;
+        B.set(Hp(H0, 1024), i);
+        // B[i][1] = H'^(1024)(H_0 || LE32(1) || LE32(i))
+        H0[16] = 1;
+        B.set(Hp(H0, 1024), i + 256);
+    }
+    let perBlock = () => { };
+    if (onProgress) {
+        const totalBlock = t * ARGON2_SYNC_POINTS * p * segmentLen;
+        // Invoke callback if progress changes from 10.01 to 10.02
+        // Allows to draw smooth progress bar on up to 8K screen
+        const callbackPer = Math.max(Math.floor(totalBlock / 10000), 1);
+        let blockCnt = 0;
+        perBlock = () => {
+            blockCnt++;
+            if (onProgress && (!(blockCnt % callbackPer) || blockCnt === totalBlock))
+                onProgress(blockCnt / totalBlock);
+        };
+    }
+    clean(BUF, H0);
+    return { type, mP, p, t, version, B, laneLen, lanes, segmentLen, dkLen, perBlock, asyncTick };
+}
+function argon2Output(B, p, laneLen, dkLen) {
+    const B_final = new Uint32Array(256);
+    for (let l = 0; l < p; l++)
+        for (let j = 0; j < 256; j++)
+            B_final[j] ^= B[256 * (laneLen * l + laneLen - 1) + j];
+    const res = u8(Hp(B_final, dkLen));
+    clean(B_final);
+    return res;
+}
+function processBlock(B, address, l, r, s, index, laneLen, segmentLen, lanes, offset, prev, dataIndependent, needXor) {
+    if (offset % laneLen)
+        prev = offset - 1;
+    let randL, randH;
+    if (dataIndependent) {
+        let i128 = index % 128;
+        if (i128 === 0) {
+            address[256 + 12]++;
+            block(address, 256, 2 * 256, 0, false);
+            block(address, 0, 2 * 256, 0, false);
+        }
+        randL = address[2 * i128];
+        randH = address[2 * i128 + 1];
+    }
+    else {
+        const T = 256 * prev;
+        randL = B[T];
+        randH = B[T + 1];
+    }
+    // address block
+    const refLane = r === 0 && s === 0 ? l : randH % lanes;
+    const refPos = indexAlpha(r, s, laneLen, segmentLen, index, randL, refLane == l);
+    const refBlock = laneLen * refLane + refPos;
+    // B[i][j] = G(B[i][j-1], B[l][z])
+    block(B, 256 * prev, 256 * refBlock, offset * 256, needXor);
+}
+function argon2(type, password, salt, opts) {
+    const { mP, p, t, version, B, laneLen, lanes, segmentLen, dkLen, perBlock } = argon2Init(password, salt, type, opts);
+    // Pre-loop setup
+    // [address, input, zero_block] format so we can pass single U32 to block function
+    const address = new Uint32Array(3 * 256);
+    address[256 + 6] = mP;
+    address[256 + 8] = t;
+    address[256 + 10] = type;
+    for (let r = 0; r < t; r++) {
+        const needXor = r !== 0 && version === 0x13;
+        address[256 + 0] = r;
+        for (let s = 0; s < ARGON2_SYNC_POINTS; s++) {
+            address[256 + 4] = s;
+            const dataIndependent = type == AT.Argon2i || (type == AT.Argon2id && r === 0 && s < 2);
+            for (let l = 0; l < p; l++) {
+                address[256 + 2] = l;
+                address[256 + 12] = 0;
+                let startPos = 0;
+                if (r === 0 && s === 0) {
+                    startPos = 2;
+                    if (dataIndependent) {
+                        address[256 + 12]++;
+                        block(address, 256, 2 * 256, 0, false);
+                        block(address, 0, 2 * 256, 0, false);
+                    }
+                }
+                // current block postion
+                let offset = l * laneLen + s * segmentLen + startPos;
+                // previous block position
+                let prev = offset % laneLen ? offset - 1 : offset + laneLen - 1;
+                for (let index = startPos; index < segmentLen; index++, offset++, prev++) {
+                    perBlock();
+                    processBlock(B, address, l, r, s, index, laneLen, segmentLen, lanes, offset, prev, dataIndependent, needXor);
+                }
+            }
+        }
+    }
+    clean(address);
+    return argon2Output(B, p, laneLen, dkLen);
+}
+/** argon2d GPU-resistant version. */
+const argon2d = (password, salt, opts) => argon2(AT.Argond2d, password, salt, opts);
+/** argon2i side-channel-resistant version. */
+const argon2i = (password, salt, opts) => argon2(AT.Argon2i, password, salt, opts);
+/** argon2id, combining i+d, the most popular version from RFC 9106 */
+const argon2id = (password, salt, opts) => argon2(AT.Argon2id, password, salt, opts);
+async function argon2Async(type, password, salt, opts) {
+    const { mP, p, t, version, B, laneLen, lanes, segmentLen, dkLen, perBlock, asyncTick } = argon2Init(password, salt, type, opts);
+    // Pre-loop setup
+    // [address, input, zero_block] format so we can pass single U32 to block function
+    const address = new Uint32Array(3 * 256);
+    address[256 + 6] = mP;
+    address[256 + 8] = t;
+    address[256 + 10] = type;
+    let ts = Date.now();
+    for (let r = 0; r < t; r++) {
+        const needXor = r !== 0 && version === 0x13;
+        address[256 + 0] = r;
+        for (let s = 0; s < ARGON2_SYNC_POINTS; s++) {
+            address[256 + 4] = s;
+            const dataIndependent = type == AT.Argon2i || (type == AT.Argon2id && r === 0 && s < 2);
+            for (let l = 0; l < p; l++) {
+                address[256 + 2] = l;
+                address[256 + 12] = 0;
+                let startPos = 0;
+                if (r === 0 && s === 0) {
+                    startPos = 2;
+                    if (dataIndependent) {
+                        address[256 + 12]++;
+                        block(address, 256, 2 * 256, 0, false);
+                        block(address, 0, 2 * 256, 0, false);
+                    }
+                }
+                // current block postion
+                let offset = l * laneLen + s * segmentLen + startPos;
+                // previous block position
+                let prev = offset % laneLen ? offset - 1 : offset + laneLen - 1;
+                for (let index = startPos; index < segmentLen; index++, offset++, prev++) {
+                    perBlock();
+                    processBlock(B, address, l, r, s, index, laneLen, segmentLen, lanes, offset, prev, dataIndependent, needXor);
+                    // Date.now() is not monotonic, so in case if clock goes backwards we return return control too
+                    const diff = Date.now() - ts;
+                    if (!(diff >= 0 && diff < asyncTick)) {
+                        await nextTick();
+                        ts += diff;
+                    }
+                }
+            }
+        }
+    }
+    clean(address);
+    return argon2Output(B, p, laneLen, dkLen);
+}
+/** argon2d async GPU-resistant version. */
+const argon2dAsync = (password, salt, opts) => argon2Async(AT.Argond2d, password, salt, opts);
+/** argon2i async side-channel-resistant version. */
+const argon2iAsync = (password, salt, opts) => argon2Async(AT.Argon2i, password, salt, opts);
+/** argon2id async, combining i+d, the most popular version from RFC 9106 */
+const argon2idAsync = (password, salt, opts) => argon2Async(AT.Argon2id, password, salt, opts);
+//# sourceMappingURL=argon2.js.map
+
+globalThis.argon2idAsync = argon2idAsync;
+/* Cryptiki v3 browser client. Secrets live only in this closure and memory. */
+const API = (location.protocol === "file:" ? "https://cryptiki.com" : "").replace(/\/$/, "");
+const VERSION = "3.0.0-preview";
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+const $ = id => document.getElementById(id);
+const text = value => typeof value === "string" ? value : "";
+const bytes = value => value instanceof Uint8Array ? value : new Uint8Array(value);
+const cat = (...parts) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let at = 0; for (const p of parts) { out.set(p, at); at += p.length; } return out; };
+const hex = value => [...value].map(x => x.toString(16).padStart(2, "0")).join("");
+const b64 = value => { let s = ""; for (let i = 0; i < value.length; i += 0x8000) s += String.fromCharCode(...value.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+const unb64 = value => { const s = value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4); const raw = atob(s); return Uint8Array.from(raw, c => c.charCodeAt(0)); };
+
+async function sha(value) { return bytes(await crypto.subtle.digest("SHA-256", value)); }
+async function hkdf(key, salt, info) {
+  const imported = await crypto.subtle.importKey("raw", key, "HKDF", false, ["deriveBits"]);
+  return bytes(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, imported, 256));
+}
+async function derive(name, password, progress) {
+  const nameSalt = await sha(cat(enc.encode("cryptiki.v3.vault-salt\0"), enc.encode(name)));
+  const root = await window.argon2idAsync(enc.encode(password), nameSalt, { m: 65536, t: 3, p: 1, dkLen: 32, maxmem: 70 * 1024 * 1024, asyncTick: 20, onProgress: progress });
+  const [encKey, auth, idBytes] = await Promise.all([
+    hkdf(root, nameSalt, enc.encode("cryptiki.v3.encryption")),
+    hkdf(root, nameSalt, enc.encode("cryptiki.v3.authorization")),
+    hkdf(root, nameSalt, enc.encode("cryptiki.v3.identifier")).then(x => x.subarray(0, 16))
+  ]);
+  return { name, password, nameSalt, root, encKey, auth, id: hex(idBytes) };
+}
+async function streamBytes(input, kind) {
+  const stream = new Blob([input]).stream().pipeThrough(new kind());
+  return bytes(await new Response(stream).arrayBuffer());
+}
+function validDocument(doc) {
+  if (!doc || doc.format !== 1 || !Array.isArray(doc.entries) || doc.entries.length > 1000) throw Error("Invalid vault document");
+  for (const e of doc.entries) if (!e || typeof e.id !== "string" || typeof e.service !== "string" || typeof e.username !== "string" || typeof e.password !== "string" || typeof e.note !== "string") throw Error("Invalid vault entry");
+  return doc;
+}
+async function encrypt(doc, key) {
+  validDocument(doc);
+  const compressed = await streamBytes(enc.encode(JSON.stringify(doc)), CompressionStream.bind(null, "deflate-raw"));
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+  const aes = await crypto.subtle.importKey("raw", key, "AES-GCM", false, ["encrypt"]);
+  const version = Uint8Array.of(1);
+  const aad = cat(enc.encode("cryptiki.v3.blob\0"), version);
+  const ciphertext = bytes(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, aes, compressed));
+  return cat(version, nonce, ciphertext);
+}
+async function decrypt(blob, key) {
+  if (blob.length < 29 || blob[0] !== 1) throw Error("Invalid encrypted vault");
+  const aes = await crypto.subtle.importKey("raw", key, "AES-GCM", false, ["decrypt"]);
+  const aad = cat(enc.encode("cryptiki.v3.blob\0"), Uint8Array.of(1));
+  const compressed = bytes(await crypto.subtle.decrypt({ name: "AES-GCM", iv: blob.subarray(1, 13), additionalData: aad, tagLength: 128 }, aes, blob.subarray(13)));
+  return validDocument(JSON.parse(dec.decode(await streamBytes(compressed, DecompressionStream.bind(null, "deflate-raw")))));
+}
+function emptyDocument() { return { format: 1, entries: [] }; }
+
+const state = { keys: null, doc: null, rev: 0, selected: null, dirty: false, lockTimer: 0, hiddenAt: 0 };
+function status(message, error = false) { $("status").textContent = message; $("status").className = error ? "error" : ""; }
+function busy(value) { document.body.classList.toggle("busy", value); $("unlock").disabled = value; $("create").disabled = value; }
+function showEditor(value) { $("unlock-screen").hidden = value; $("editor-screen").hidden = !value; }
+function touch() { clearTimeout(state.lockTimer); state.lockTimer = setTimeout(lock, 15 * 60 * 1000); }
+function lock() {
+  clearTimeout(state.lockTimer);
+  for (const key of ["root", "encKey", "auth", "nameSalt"]) state.keys?.[key]?.fill?.(0);
+  if (state.keys) { state.keys.password = ""; state.keys.name = ""; }
+  state.keys = null; state.doc = null; state.rev = 0; state.selected = null; state.dirty = false;
+  for (const id of ["name", "master-password", "service", "username", "entry-password", "note", "search"]) $(id).value = "";
+  showEditor(false); renderEntries(); status("Locked"); $("name").focus();
+}
+function markDirty() { state.dirty = true; $("save").textContent = "Save changes"; touch(); }
+function renderEntries() {
+  const list = $("entries"); list.replaceChildren();
+  const needle = $("search").value.trim().toLowerCase();
+  const entries = (state.doc?.entries || []).filter(e => !needle || [e.service, e.username, e.note].some(v => v.toLowerCase().includes(needle)));
+  $("count").textContent = `${entries.length} / ${state.doc?.entries?.length || 0}`;
+  for (const entry of entries) {
+    const row = document.createElement("article"); row.className = "entry";
+    const title = document.createElement("strong"); title.textContent = entry.service || "(unnamed)";
+    const meta = document.createElement("span"); meta.textContent = entry.username;
+    const edit = button("Edit", () => editEntry(entry.id));
+    const copyUser = button("Copy username", () => copySecret(entry.username, copyUser));
+    const copy = button("Copy password", () => copySecret(entry.password, copy));
+    row.append(title, meta, edit, copyUser, copy); list.append(row);
+  }
+}
+function button(label, action) { const b = document.createElement("button"); b.type = "button"; b.className = "secondary"; b.textContent = label; b.addEventListener("click", action); return b; }
+function editEntry(id) {
+  state.selected = id;
+  const e = state.doc.entries.find(x => x.id === id);
+  $("service").value = e?.service || ""; $("username").value = e?.username || ""; $("entry-password").value = e?.password || ""; $("note").value = e?.note || ""; $("service").focus();
+}
+function newEntry() { state.selected = crypto.randomUUID(); $("service").value = ""; $("username").value = ""; $("entry-password").value = ""; $("note").value = ""; $("service").focus(); }
+function saveEntry() {
+  if (!state.doc) return;
+  const entry = { id: state.selected || crypto.randomUUID(), service: $("service").value.trim(), username: $("username").value, password: $("entry-password").value, note: $("note").value };
+  if (!entry.service) return status("Service is required", true);
+  const old = state.doc.entries.findIndex(e => e.id === entry.id); if (old < 0) state.doc.entries.push(entry); else state.doc.entries[old] = entry;
+  state.selected = entry.id; markDirty(); renderEntries(); status("Unsaved changes");
+}
+function deleteEntry() { const i = state.doc?.entries.findIndex(e => e.id === state.selected); if (i < 0) return; if (!confirm("Delete this entry?")) return; state.doc.entries.splice(i, 1); state.selected = null; markDirty(); renderEntries(); status("Unsaved changes"); }
+async function api(method, path, headers = {}, body) {
+  const h = new Headers(headers); if (state.keys) h.set("Authorization", `Bearer ${b64(state.keys.auth)}`); if (body) h.set("Content-Type", "application/json");
+  return fetch(`${API}/api/vaults/${path}`, { method, headers: h, body: body && JSON.stringify(body), cache: "no-store" });
+}
+async function unlock(create) {
+  const name = $("name").value.trim(), password = $("master-password").value;
+  if (!name || !password) return status("Enter a vault name and master password", true);
+  busy(true); status("Deriving key (this takes a moment)…");
+  try {
+    const keys = await derive(name, password, p => { $("progress").value = p; }); state.keys = keys;
+    const response = await api("GET", keys.id);
+    if (response.ok) { const data = await response.json(); state.doc = await decrypt(unb64(data.blob), keys.encKey); state.rev = data.rev; }
+    else if (response.status === 404 && create) { state.doc = emptyDocument(); const blob = await encrypt(state.doc, keys.encKey); const made = await api("POST", keys.id, { "If-None-Match": "*" }, { blob: b64(blob) }); if (!made.ok) throw Error(made.status === 409 ? "That vault already exists" : "Vault creation failed"); state.rev = 1; }
+    else { state.keys = null; throw Error(response.status === 404 ? "Vault not found or credentials are wrong" : "Unlock failed"); }
+    showEditor(true); renderEntries(); newEntry(); touch(); status("Saved"); $("search").focus();
+  } catch (error) { lock(); status(error.message || "Unlock failed", true); }
+  finally { busy(false); $("progress").value = 0; }
+}
+async function saveVault() {
+  if (!state.keys || !state.doc) return;
+  busy(true); status("Encrypting…");
+  try {
+    const blob = await encrypt(state.doc, state.keys.encKey);
+    const response = state.rev ? await api("PUT", state.keys.id, { "If-Match": String(state.rev) }, { blob: b64(blob) }) : await api("POST", state.keys.id, { "If-None-Match": "*" }, { blob: b64(blob) });
+    if (response.status === 409) return showConflict(blob);
+    if (!response.ok) throw Error("Save failed");
+    state.rev = (await response.json()).rev; state.dirty = false; status(`Saved revision ${state.rev}`); $("save").textContent = "Save";
+  } catch (error) { status(error.message || "Save failed", true); } finally { busy(false); }
+}
+async function showConflict(mine) {
+  status("Conflict: someone saved a newer revision", true); $("conflict").hidden = false;
+  $("reload-theirs").onclick = async () => { const r = await api("GET", state.keys.id); if (!r.ok) return status("Could not reload", true); const d = await r.json(); state.doc = await decrypt(unb64(d.blob), state.keys.encKey); state.rev = d.rev; state.dirty = false; $("conflict").hidden = true; renderEntries(); status("Reloaded their revision"); };
+  $("download-mine").onclick = () => download("cryptiki-v3-conflict.json", JSON.stringify({ format: 1, blob: b64(mine) }));
+}
+async function copySecret(value, source) { try { await navigator.clipboard.writeText(value); source.textContent = "Copied"; setTimeout(() => source.textContent = "Copy password", 1500); setTimeout(() => navigator.clipboard.writeText("").catch(() => {}), 15000); } catch { status("Clipboard unavailable", true); } }
+function generate() { const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*-_"; const random = crypto.getRandomValues(new Uint8Array(24)); $("entry-password").value = [...random].map(x => alphabet[x % alphabet.length]).join(""); markDirty(); }
+function download(name, content) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([content], { type: "application/octet-stream" })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+async function exportVault() { const salt = crypto.getRandomValues(new Uint8Array(16)); const key = await hkdf(state.keys.root, salt, enc.encode("cryptiki.v3.export")); const blob = await encrypt(state.doc, key); download("cryptiki-v3-export.json", JSON.stringify({ format: 1, salt: b64(salt), blob: b64(blob) }, null, 2)); }
+async function importVault() { const raw = prompt("Paste a Cryptiki v3 export JSON"); if (!raw) return; try { const data = JSON.parse(raw); const key = await hkdf(state.keys.root, unb64(data.salt), enc.encode("cryptiki.v3.export")); state.doc = await decrypt(unb64(data.blob), key); state.selected = null; markDirty(); renderEntries(); status("Imported; save to sync"); } catch { status("Import failed or export credentials differ", true); } }
+async function changeCredentials() {
+  const enteredName = prompt("New vault name (blank keeps current)", state.keys.name); if (enteredName === null) return;
+  const enteredPassword = prompt("New master password (blank keeps current)"); if (enteredPassword === null) return;
+  const name = enteredName.trim() || state.keys.name; const password = enteredPassword || state.keys.password;
+  busy(true); status("Creating the new vault…"); const old = state.keys;
+  try { const next = await derive(name.trim(), password); const blob = await encrypt(state.doc, next.encKey); const made = await apiWith("POST", next.id, next.auth, { "If-None-Match": "*" }, { blob: b64(blob) }); if (!made.ok) throw Error("New credentials already exist or could not be created"); const check = await apiWith("GET", next.id, next.auth); const verified = await check.json(); await decrypt(unb64(verified.blob), next.encKey); const removed = await apiWith("DELETE", old.id, old.auth); if (!removed.ok && removed.status !== 204) { state.keys = next; state.rev = verified.rev; return status("Both vaults exist; retry deletion of the old vault", true); } state.keys = next; state.rev = 1; state.dirty = false; $("name").value = name; status("Credentials changed"); }
+  catch (error) { status(error.message || "Credential change failed", true); } finally { busy(false); }
+}
+async function apiWith(method, id, auth, headers = {}, body) { const h = new Headers(headers); h.set("Authorization", `Bearer ${b64(auth)}`); if (body) h.set("Content-Type", "application/json"); return fetch(`${API}/api/vaults/${id}`, { method, headers: h, body: body && JSON.stringify(body), cache: "no-store" }); }
+function saveApp() { download("cryptiki-v3.html", `<!doctype html>\n${document.documentElement.outerHTML}`); }
+function pageHash() { const html = document.documentElement.outerHTML.replace(/(<code id="page-hash">)[^<]*/, "$1"); sha(enc.encode(html)).then(x => $("page-hash").textContent = hex(x)); }
+window.addEventListener("DOMContentLoaded", () => {
+  $("version").textContent = VERSION; $("unlock").onclick = () => unlock(false); $("create").onclick = () => unlock(true); $("lock").onclick = lock; $("new-entry").onclick = newEntry; $("save-entry").onclick = saveEntry; $("delete-entry").onclick = deleteEntry; $("generate").onclick = generate; $("save").onclick = saveVault; $("export").onclick = exportVault; $("import").onclick = importVault; $("change").onclick = changeCredentials; $("save-app").onclick = saveApp; $("search").oninput = renderEntries; $("dismiss").onclick = () => $("notice").hidden = true; $("name").focus(); pageHash();
+  document.addEventListener("keydown", touch); document.addEventListener("visibilitychange", () => { if (document.hidden) state.hiddenAt = Date.now(); else if (state.hiddenAt && Date.now() - state.hiddenAt > 60_000) lock(); else touch(); }); window.addEventListener("beforeunload", e => { if (state.dirty) { e.preventDefault(); e.returnValue = ""; } });
+});
+</script>
+</body></html>

@@ -1,0 +1,46 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import worker from "../src/worker.js";
+
+const b64 = x => Buffer.from(x).toString("base64url");
+const id = "0123456789abcdef0123456789abcdef";
+const blob = Uint8Array.from({ length: 20 }, (_, i) => i + 1);
+class DB {
+  constructor() { this.vaults = new Map(); this.revisions = []; }
+  prepare(sql) { return new Stmt(this, sql); }
+  async batch(stmts) { return Promise.all(stmts.map(s => s.run())); }
+}
+class Stmt {
+  constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
+  bind(...args) { this.args = args; return this; }
+  async first() { const row = this.db.vaults.get(this.args[0]); return row ? { ...row, auth_hash: row.auth_hash.slice(), blob: row.blob.slice() } : null; }
+  async run() {
+    const [id, a, b, c, d] = this.args;
+    if (this.sql.startsWith("INSERT INTO vaults")) { if (this.db.vaults.has(id)) return { meta: { changes: 0 } }; this.db.vaults.set(id, { id, auth_hash: a.slice(), blob: b.slice(), rev: 1, created: c, modified: c }); return { meta: { changes: 1 } }; }
+    if (this.sql.startsWith("INSERT INTO revisions")) { const row = this.db.vaults.get(id); if (row && Buffer.from(row.auth_hash).equals(Buffer.from(b)) && row.rev === c) this.db.revisions.push({ id, rev: row.rev, blob: row.blob.slice(), saved: a }); return { meta: { changes: 1 } }; }
+    if (this.sql.startsWith("UPDATE vaults")) { const row = this.db.vaults.get(id); if (!row || !Buffer.from(row.auth_hash).equals(Buffer.from(c)) || row.rev !== d) return { meta: { changes: 0 } }; row.blob = a.slice(); row.rev++; row.modified = b; return { meta: { changes: 1 } }; }
+    if (this.sql.startsWith("DELETE FROM revisions WHERE id = ?1 AND rev <")) { const row = this.db.vaults.get(id); this.db.revisions = this.db.revisions.filter(x => x.id !== id || x.rev >= row.rev - 10); return { meta: { changes: 1 } }; }
+    if (this.sql.startsWith("DELETE FROM revisions")) { this.db.revisions = this.db.revisions.filter(x => x.id !== id); return { meta: { changes: 1 } }; }
+    if (this.sql.startsWith("DELETE FROM vaults")) { const row = this.db.vaults.get(id); if (row && Buffer.from(row.auth_hash).equals(Buffer.from(a))) this.db.vaults.delete(id); return { meta: { changes: 1 } }; }
+    return { meta: { changes: 0 } };
+  }
+}
+const auth = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
+const other = Uint8Array.from({ length: 32 }, (_, i) => i + 2);
+const request = (method, authorization = auth, headers = {}, body) => new Request(`https://preview.example/api/vaults/${id}`, { method, headers: { Origin: "null", ...(authorization && { Authorization: `Bearer ${b64(authorization)}` }), ...headers }, body: body && JSON.stringify(body) });
+const env = () => ({ DB: new DB(), ASSETS: { fetch: () => new Response("app") } });
+
+test("create is insert-only and all existing-vault operations authenticate", async () => {
+  const e = env(); const make = await worker.fetch(request("POST", auth, { "If-None-Match": "*", "Content-Type": "application/json" }, { blob: b64(blob) }), e); assert.equal(make.status, 201);
+  const hidden = await worker.fetch(request("POST", other, { "If-None-Match": "*", "Content-Type": "application/json" }, { blob: b64(Uint8Array.of(9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9)) }), e); assert.equal(hidden.status, 404);
+  const replace = await worker.fetch(request("POST", auth, { "If-None-Match": "*", "Content-Type": "application/json" }, { blob: b64(Uint8Array.of(9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9)) }), e); assert.equal(replace.status, 409);
+  for (const method of ["GET", "PUT", "DELETE"]) { const r = await worker.fetch(request(method, other, method === "PUT" ? { "If-Match": "1", "Content-Type": "application/json" } : {}, method === "PUT" ? { blob: b64(blob) } : undefined), e); assert.equal(r.status, 404); }
+  const read = await worker.fetch(request("GET", auth), e); assert.equal((await read.json()).blob, b64(blob));
+});
+
+test("CAS conflicts preserve data and pruning keeps ten revisions", async () => {
+  const e = env(); await worker.fetch(request("POST", auth, { "If-None-Match": "*", "Content-Type": "application/json" }, { blob: b64(blob) }), e);
+  const conflict = await worker.fetch(request("PUT", auth, { "If-Match": "0", "Content-Type": "application/json" }, { blob: b64(blob) }), e); assert.equal(conflict.status, 409);
+  for (let i = 1; i <= 12; i++) { const r = await worker.fetch(request("PUT", auth, { "If-Match": String(i), "Content-Type": "application/json" }, { blob: b64(Uint8Array.from({ length: 20 }, () => i)) }), e); assert.equal(r.status, 200); }
+  assert.equal(e.DB.revisions.length, 10); const stale = await worker.fetch(request("PUT", auth, { "If-Match": "1", "Content-Type": "application/json" }, { blob: b64(blob) }), e); assert.equal(stale.status, 409);
+});

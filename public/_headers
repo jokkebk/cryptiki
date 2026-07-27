@@ -1,0 +1,9 @@
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-v0hg1AP853lePXVBAj7dewt2oADKIObf9z9e3rv9ETc='; style-src 'sha256-fCXvyGF6toz6OODJ8f0k+cENpYxMNXp2oRfYokgVYbI='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Cache-Control: no-store
+
+/api/*
+  Cache-Control: no-store

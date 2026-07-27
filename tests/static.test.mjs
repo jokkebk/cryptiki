@@ -1,0 +1,23 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+const worker = readFileSync(new URL("../src/worker.js", import.meta.url), "utf8");
+
+test("standalone deployed code stays local and within the budget", () => {
+  assert.ok(html.includes('location.protocol === "file:"'));
+  assert.ok(html.includes("https://cryptiki.com"));
+  assert.doesNotMatch(html, /<(?:script|link)[^>]+(?:src|href)=["']https?:/i);
+  assert.doesNotMatch(html, /\b(?:localStorage|sessionStorage|indexedDB)\s*\./);
+  assert.doesNotMatch(html, /innerHTML/);
+  assert.ok(html.split("\n").length + worker.split("\n").length < 2000);
+  assert.ok(Buffer.byteLength(html) + Buffer.byteLength(worker) < 100 * 1024);
+});
+
+test("Worker SQL is prepared-only and uses no legacy schema", () => {
+  assert.doesNotMatch(worker, /`(?:SELECT|INSERT|UPDATE|DELETE)[^`]*\$\{/);
+  assert.doesNotMatch(worker, /pages|keyhash|passhash|contenthash|AES-CTR|PBKDF2/);
+  assert.match(worker, /If-None-Match/);
+  assert.match(worker, /If-Match/);
+});
