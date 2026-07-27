@@ -97,13 +97,18 @@ node tools/build-legacy-capsules.mjs \
   --output /private/tmp/cryptiki-capsules.jsonl
 node tools/import-legacy-capsules.mjs \
   --input /private/tmp/cryptiki-capsules.jsonl \
-  --output /private/tmp/cryptiki-capsules.sql
+  --output-dir /private/tmp/cryptiki-capsule-chunks
+for file in /private/tmp/cryptiki-capsule-chunks/chunk-*.sql; do
+  npx wrangler d1 execute cryptiki-v3-production --remote \
+    --file "$file" --config wrangler.production.jsonc
+done
 ```
 
-Before any real import, apply `0002_legacy_capsules.sql` and import only into
-the preview D1 database, then compare the v1/v2 counts. The raw dump must stay
-offline and must never enter Git, CI, Cloudflare, or logs. The production
-database is deliberately untouched until every known vault has been recovered
-and verified. The temporary recovery window closes on **2027-01-26**; remove
+The importer uses binary-safe `unhex()` assembly and keeps each D1 request below
+the Wrangler file-size limit; do not wrap the generated statements in an
+explicit SQL transaction. The raw dump must stay offline and must never enter
+Git, CI, Cloudflare, or logs. Compare the imported v1/v2 counts before asking
+users to recover vaults. The temporary recovery window closes on **2027-01-26**;
+remove
 `public/migrate.html`, the `/api/legacy/recover` route, and migration 0002 as a
 dated operational task after that window.
