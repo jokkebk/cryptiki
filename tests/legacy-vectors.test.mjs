@@ -53,6 +53,12 @@ test("v2 PBKDF2 and AES-CTR vector decrypts and parses safely", async () => {
   assert.equal(await verifyPlaintext(wrong, shaHex(Buffer.from(plaintext))), false);
 });
 
+test("legacy parser accepts a large document while keeping field limits", () => {
+  const plaintext = JSON.stringify(Array.from({ length: 400 }, (_, i) => ({ service: `service-${i}`, username: "user", password: "password", text: "note" })));
+  assert.ok(plaintext.length > 16 * 1024);
+  assert.equal(parseLegacyEntries(plaintext, 2).length, 400);
+});
+
 test("capsules are memory-hard, opaque, authenticated, and recover both formats", async () => {
   const created = 1700000000000, expires = created + 1000;
   for (const row of [v1Row, (() => { const v2 = v2Encrypt("[]", "v2 synthetic", "another password"); return { id: 2, keyhash: v2.keyhash, passhash: v2.passhash, contenthash: shaHex(Buffer.from("[]")), content: v2.content, accessed: v1Row.accessed, modified: v1Row.modified }; })()]) {

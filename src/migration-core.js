@@ -145,11 +145,15 @@ export async function v2Decrypt(contentJson, passhash) {
 export async function verifyPlaintext(plaintext, contentHash) { return hex(await sha(enc.encode(plaintext))).toLowerCase() === contentHash.toLowerCase(); }
 
 function checkText(value, label) { return stringValue(value, label); }
+function checkPlaintext(value) {
+  if (typeof value !== "string" || value.length > MAX_CONTENT) throw Error("invalid plaintext");
+  return value;
+}
 function entry(service, username, password, note) {
   return { id: globalThis.crypto.randomUUID(), service: checkText(service, "service"), username: checkText(username, "username"), password: checkText(password, "password"), note: checkText(note, "note") };
 }
 export function parseLegacyEntries(plaintext, format) {
-  checkText(plaintext, "plaintext");
+  checkPlaintext(plaintext);
   if (format === 2) {
     let values;
     try { values = JSON.parse(plaintext); } catch { throw Error("invalid v2 document"); }
