@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "npm run check:csp && node --test tests/*.test.mjs",
+    "test": "npm run check:assembled && npm run check:csp && node --test tests/*.test.mjs",
+    "check:assembled": "node tools/check-assembled.mjs",
     "check:csp": "node tools/check-csp-hash.mjs",
     "assemble": "node tools/assemble-index.mjs",
     "assemble:migrate": "node tools/assemble-migrate.mjs"
