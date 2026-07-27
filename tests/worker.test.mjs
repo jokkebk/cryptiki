@@ -6,14 +6,17 @@ const b64 = x => Buffer.from(x).toString("base64url");
 const id = "0123456789abcdef0123456789abcdef";
 const blob = Uint8Array.from({ length: 20 }, (_, i) => i + 1);
 class DB {
-  constructor() { this.vaults = new Map(); this.revisions = []; }
+  constructor() { this.vaults = new Map(); this.revisions = []; this.legacyCapsules = new Map(); }
   prepare(sql) { return new Stmt(this, sql); }
   async batch(stmts) { return Promise.all(stmts.map(s => s.run())); }
 }
 class Stmt {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
   bind(...args) { this.args = args; return this; }
-  async first() { const row = this.db.vaults.get(this.args[0]); return row ? { ...row, auth_hash: row.auth_hash.slice(), blob: row.blob.slice() } : null; }
+  async first() {
+    if (this.sql.startsWith("SELECT format, blob FROM legacy_capsules")) { const row = this.db.legacyCapsules.get(this.args[0]); return row && row.expires > this.args[1] ? { format: row.format, blob: row.blob.slice() } : null; }
+    const row = this.db.vaults.get(this.args[0]); return row ? { ...row, auth_hash: row.auth_hash.slice(), blob: row.blob.slice() } : null;
+  }
   async run() {
     const [id, a, b, c, d] = this.args;
     if (this.sql.startsWith("INSERT INTO vaults")) { if (this.db.vaults.has(id)) return { meta: { changes: 0 } }; this.db.vaults.set(id, { id, auth_hash: a.slice(), blob: b.slice(), rev: 1, created: c, modified: c }); return { meta: { changes: 1 } }; }
@@ -43,4 +46,15 @@ test("CAS conflicts preserve data and pruning keeps ten revisions", async () => 
   const conflict = await worker.fetch(request("PUT", auth, { "If-Match": "0", "Content-Type": "application/json" }, { blob: b64(blob) }), e); assert.equal(conflict.status, 409);
   for (let i = 1; i <= 12; i++) { const r = await worker.fetch(request("PUT", auth, { "If-Match": String(i), "Content-Type": "application/json" }, { blob: b64(Uint8Array.from({ length: 20 }, () => i)) }), e); assert.equal(r.status, 200); }
   assert.equal(e.DB.revisions.length, 10); const stale = await worker.fetch(request("PUT", auth, { "If-Match": "1", "Content-Type": "application/json" }, { blob: b64(blob) }), e); assert.equal(stale.status, 409);
+});
+
+test("legacy recovery is read-only, opaque, expiring, and non-enumerable", async () => {
+  const e = env(); const lookupId = "abcdefabcdefabcdefabcdefabcdefab"; const capsule = Uint8Array.from({ length: 30 }, (_, i) => i + 1); capsule[1] = 1;
+  e.DB.legacyCapsules.set(lookupId, { format: 1, blob: capsule, expires: Date.now() + 60_000 });
+  const recover = (method, value, extra = {}) => new Request("https://cryptiki.com/api/legacy/recover", { method, headers: { Origin: "null", ...(method === "POST" && { "Content-Type": "application/json" }), ...extra }, body: value && JSON.stringify(value) });
+  const ok = await worker.fetch(recover("POST", { lookupId }), e); assert.equal(ok.status, 200); assert.equal((await ok.json()).format, 1); assert.equal(ok.headers.get("Access-Control-Allow-Origin"), "null");
+  const missing = await worker.fetch(recover("POST", { lookupId: "00000000000000000000000000000000" }), e); assert.equal(missing.status, 404);
+  const expired = await worker.fetch(recover("POST", { lookupId }), { ...e, DB: (() => { const db = new DB(); db.legacyCapsules.set(lookupId, { format: 1, blob: capsule, expires: Date.now() - 1 }); return db; })() }); assert.equal(expired.status, 404);
+  assert.equal((await worker.fetch(recover("GET", null), e)).status, 405);
+  assert.equal((await worker.fetch(recover("POST", { lookupId }, { "Content-Type": "text/plain" }), e)).status, 404);
 });

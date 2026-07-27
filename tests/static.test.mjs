@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+const migration = readFileSync(new URL("../public/migrate.html", import.meta.url), "utf8");
 const worker = readFileSync(new URL("../src/worker.js", import.meta.url), "utf8");
 
 test("standalone deployed code stays local and within the budget", () => {
@@ -20,4 +21,14 @@ test("Worker SQL is prepared-only and uses no legacy schema", () => {
   assert.doesNotMatch(worker, /pages|keyhash|passhash|contenthash|AES-CTR|PBKDF2/);
   assert.match(worker, /If-None-Match/);
   assert.match(worker, /If-Match/);
+});
+
+test("temporary migration page is standalone and text-safe", () => {
+  assert.doesNotMatch(migration, /<(?:script|link)[^>]+(?:src|href)=["']https?:/i);
+  assert.doesNotMatch(migration, /\b(?:localStorage|sessionStorage|indexedDB)\s*\./);
+  assert.doesNotMatch(migration, /innerHTML/);
+  assert.match(migration, /api\/legacy\/recover/);
+  assert.match(migration, /If-None-Match/);
+  assert.match(migration, /Recovery window closes 2027-01-26/);
+  assert.ok(Buffer.byteLength(migration) < 100 * 1024);
 });

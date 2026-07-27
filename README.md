@@ -77,5 +77,33 @@ Releases should report the git commit SHA plus the SHA-256 of the served
 `public/index.html`. Keep production and preview database IDs separate.
 
 The retirement notice intentionally links to `/legacy-migration`, an extension
-point for the separate temporary migration tool. v1/v2 migration and recovery
-are out of scope here.
+point for the separate temporary migration tool. The temporary recovery path is
+now implemented in `public/migrate.html` and the read-only
+`/api/legacy/recover` endpoint. It has its own disposable `legacy_capsules`
+table in `migrations/0002_legacy_capsules.sql`; it never reads or writes
+`vaults` during recovery.
+
+## Legacy migration runbook
+
+The raw SQL dump is an offline secret-bearing artifact and is intentionally not
+tracked. `tools/build-legacy-capsules.mjs` parses it as data, never executes
+SQL, uses no network APIs, processes rows sequentially, and emits only a
+600-permission JSONL capsule file plus aggregate counts and its SHA-256. It
+does not decrypt legacy content or need a user's raw password:
+
+```sh
+node tools/build-legacy-capsules.mjs \
+  --input "/Users/joonas.pihlajamaa/koodi/cryptiki_pages_20260727.sql" \
+  --output /private/tmp/cryptiki-capsules.jsonl
+node tools/import-legacy-capsules.mjs \
+  --input /private/tmp/cryptiki-capsules.jsonl \
+  --output /private/tmp/cryptiki-capsules.sql
+```
+
+Before any real import, apply `0002_legacy_capsules.sql` and import only into
+the preview D1 database, then compare the v1/v2 counts. The raw dump must stay
+offline and must never enter Git, CI, Cloudflare, or logs. The production
+database is deliberately untouched until every known vault has been recovered
+and verified. The temporary recovery window closes on **2027-01-26**; remove
+`public/migrate.html`, the `/api/legacy/recover` route, and migration 0002 as a
+dated operational task after that window.
