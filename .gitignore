@@ -1,3 +1,4 @@
 config.php
 media
 .wrangler/
+__pycache__/

@@ -112,3 +112,29 @@ users to recover vaults. The temporary recovery window closes on **2027-01-26**;
 remove
 `public/migrate.html`, the `/api/legacy/recover` route, and migration 0002 as a
 dated operational task after that window.
+
+For a private terminal trace of one recovery attempt, use the standard-library
+diagnostic tool. It reports page lookup, password-hash match, legacy AES
+decryption/content-hash verification, and—when requested—the capsule lookup
+and AES-GCM verification. It does not print passwords, hashes, ciphertext, or
+plaintext. The `--url` mode sends only the derived opaque lookup ID to the
+recovery endpoint:
+
+```sh
+python3 tools/verify-legacy.py --format 2 --url https://cryptiki.com
+```
+
+If the generated local JSONL capsule file is available, verify that instead:
+
+```sh
+python3 tools/verify-legacy.py --format 2 \
+  --capsules /path/to/cryptiki-capsules.jsonl
+```
+
+Enter the page name exactly as it was stored in the old v2 page. If using the
+old page's saved `keyhash`, provide it with `--recovery-code`; do not use the
+old page's `passkey`. Keep the SQL dump, terminal history, and diagnostic
+output private. A successful SQL check followed by a failed capsule check
+isolates the problem to capsule derivation/import/endpoint handling; a failed
+SQL check means the page name, recovery code, password, or legacy algorithm
+inputs do not match the original row.
