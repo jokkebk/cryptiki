@@ -127,7 +127,9 @@ async function createVault(event) {
     if (!read.ok) throw Error("new vault verification failed");
     const saved = await read.json(); const verified = await decryptV3(unb64(saved.blob), keys.encKey);
     if (JSON.stringify(verified) !== JSON.stringify(doc)) throw Error("new vault verification failed");
-    clearSensitive(); show("recovery-card", false); show("preview-card", false); show("parse-failure-card", false); show("failure-card", false); show("result-card", true); $("progress").hidden = true; status("Migration complete"); busy(false);
+    let consumed = false;
+    try { const removed = await fetch(`${API_BASE}/api/legacy/recover`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lookupId: state.capsule.lookupId }), cache: "no-store" }); consumed = removed.status === 204; } catch { /* the new vault is already verified; cleanup can be retried operationally */ }
+    clearSensitive(); show("recovery-card", false); show("preview-card", false); show("parse-failure-card", false); show("failure-card", false); show("result-card", true); $("cleanup-status").textContent = consumed ? "The one-time recovery capsule was consumed." : "The new vault is verified, but capsule cleanup could not be confirmed; an operator must remove the capsule."; $("progress").hidden = true; status("Migration complete"); busy(false);
   } catch (error) {
     if (error?.message?.includes("already exists")) { clearSensitive(); show("preview-card", false); show("failure-card", true); $("failure").textContent = "The new vault could not be created because those credentials already identify a vault. Start again with a different new name or password."; $("progress").hidden = true; status("Migration failed", true); busy(false); }
     else genericFailure();

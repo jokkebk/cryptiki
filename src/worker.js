@@ -159,7 +159,7 @@ async function api(request, env, id) {
 async function recoverLegacy(request, env) {
   const origin = request.headers.get("Origin") || "";
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: headers(origin, request.url) });
-  if (request.method !== "POST") return json({ error: "method not allowed" }, 405, origin, request.url);
+  if (request.method !== "POST" && request.method !== "DELETE") return json({ error: "method not allowed" }, 405, origin, request.url);
   const actor = edgeKey(request);
   if (!await allowed(env.REQUEST_LIMITER, `legacy:${actor}`)) return json({ error: "try later" }, 429, origin, request.url);
   if (!await allowed(env.AUTH_LIMITER, `legacy:${actor}`)) return json({ error: "try later" }, 429, origin, request.url);
@@ -172,6 +172,10 @@ async function recoverLegacy(request, env) {
   } catch { return generic(origin, request.url); }
   const lookupId = body && body.lookupId;
   if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 1 || !LOOKUP_ID_RE.test(lookupId || "")) return generic(origin, request.url);
+  if (request.method === "DELETE") {
+    await env.DB.prepare("DELETE FROM legacy_capsules WHERE lookup_id = ?1").bind(lookupId).run();
+    return new Response(null, { status: 204, headers: headers(origin, request.url) });
+  }
   const row = await env.DB.prepare("SELECT format, blob FROM legacy_capsules WHERE lookup_id = ?1 AND expires > ?2")
     .bind(lookupId, Date.now()).first();
   if (!row || (row.format !== 1 && row.format !== 2) || !row.blob) return generic(origin, request.url);

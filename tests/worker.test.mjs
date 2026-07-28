@@ -23,6 +23,7 @@ class Stmt {
     if (this.sql.startsWith("INSERT INTO revisions")) { const row = this.db.vaults.get(id); if (row && Buffer.from(row.auth_hash).equals(Buffer.from(b)) && row.rev === c) this.db.revisions.push({ id, rev: row.rev, blob: row.blob.slice(), saved: a }); return { meta: { changes: 1 } }; }
     if (this.sql.startsWith("UPDATE vaults")) { const row = this.db.vaults.get(id); if (!row || !Buffer.from(row.auth_hash).equals(Buffer.from(c)) || row.rev !== d) return { meta: { changes: 0 } }; row.blob = a.slice(); row.rev++; row.modified = b; return { meta: { changes: 1 } }; }
     if (this.sql.startsWith("DELETE FROM revisions WHERE id = ?1 AND rev <")) { const row = this.db.vaults.get(id); this.db.revisions = this.db.revisions.filter(x => x.id !== id || x.rev >= row.rev - 10); return { meta: { changes: 1 } }; }
+    if (this.sql.startsWith("DELETE FROM legacy_capsules")) { this.db.legacyCapsules.delete(this.args[0]); return { meta: { changes: 1 } }; }
     if (this.sql.startsWith("DELETE FROM revisions")) { this.db.revisions = this.db.revisions.filter(x => x.id !== id); return { meta: { changes: 1 } }; }
     if (this.sql.startsWith("DELETE FROM vaults")) { const row = this.db.vaults.get(id); if (row && Buffer.from(row.auth_hash).equals(Buffer.from(a))) this.db.vaults.delete(id); return { meta: { changes: 1 } }; }
     return { meta: { changes: 0 } };
@@ -79,8 +80,9 @@ test("CAS conflicts preserve data and pruning keeps ten revisions", async () => 
 test("legacy recovery is read-only, opaque, expiring, and non-enumerable", async () => {
   const e = env(); const lookupId = "abcdefabcdefabcdefabcdefabcdefab"; const capsule = Uint8Array.from({ length: 30 }, (_, i) => i + 1); capsule[1] = 1;
   e.DB.legacyCapsules.set(lookupId, { format: 1, blob: capsule, expires: Date.now() + 60_000 });
-  const recover = (method, value, extra = {}) => new Request("https://cryptiki.com/api/legacy/recover", { method, headers: { Origin: "null", ...(method === "POST" && { "Content-Type": "application/json" }), ...extra }, body: value && JSON.stringify(value) });
+  const recover = (method, value, extra = {}) => new Request("https://cryptiki.com/api/legacy/recover", { method, headers: { Origin: "null", ...(["POST", "DELETE"].includes(method) && { "Content-Type": "application/json" }), ...extra }, body: value && JSON.stringify(value) });
   const ok = await worker.fetch(recover("POST", { lookupId }), e); assert.equal(ok.status, 200); assert.equal((await ok.json()).format, 1); assert.equal(ok.headers.get("Access-Control-Allow-Origin"), "null");
+  const consumed = await worker.fetch(recover("DELETE", { lookupId }), e); assert.equal(consumed.status, 204); assert.equal(e.DB.legacyCapsules.has(lookupId), false);
   const missing = await worker.fetch(recover("POST", { lookupId: "00000000000000000000000000000000" }), e); assert.equal(missing.status, 404);
   const expired = await worker.fetch(recover("POST", { lookupId }), { ...e, DB: (() => { const db = new DB(); db.legacyCapsules.set(lookupId, { format: 1, blob: capsule, expires: Date.now() - 1 }); return db; })() }); assert.equal(expired.status, 404);
   assert.equal((await worker.fetch(recover("GET", null), e)).status, 405);
