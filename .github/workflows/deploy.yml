@@ -4,14 +4,25 @@ on:
   push:
     tags: ["v3-preview-*"]
 
+permissions:
+  contents: read
+
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: npm test
+      - run: shasum -a 256 public/index.html public/migrate.html >> "$GITHUB_STEP_SUMMARY"
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment: preview
     steps:
-      - uses: actions/checkout@v4
-      - uses: cloudflare/wrangler-action@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.81.0"
           command: deploy --config wrangler.jsonc

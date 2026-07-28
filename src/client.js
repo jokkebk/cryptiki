@@ -74,6 +74,7 @@ async function decrypt(blob, key) {
   return validDocument(JSON.parse(dec.decode(await streamBytes(compressed, DecompressionStream.bind(null, "deflate-raw"), MAX_DOCUMENT_BYTES))));
 }
 function emptyDocument() { return { format: 1, entries: [] }; }
+function strongCredentials(name, password) { return name.length >= 4 && password.length >= 12 && name.length + password.length >= 24; }
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*-_";
 const state = { keys: null, doc: null, rev: 0, dirty: false, lockTimer: 0, hiddenAt: 0, showAll: false, fresh: new Set(), openNotes: new Set(), rotation: null };
@@ -227,6 +228,7 @@ async function api(method, path, headers = {}, body) {
 async function unlock(create) {
   const name = $("name").value.trim(), password = $("master-password").value;
   if (!name || !password) return status("Enter a vault name and master password", true);
+  if (create && !strongCredentials(name, password)) return status("Use a vault name of 4+ characters and a master password of 12+ characters", true);
   busy(true); status("Deriving key (this takes a moment)…");
   try {
     const keys = await derive(name, password, p => { $("progress").value = p; }); state.keys = keys;
@@ -276,6 +278,7 @@ async function changeCredentials() {
 async function rotateCredentials(event) {
   event.preventDefault(); const name = $("new-credential-name").value.trim(), password = $("new-credential-password").value, confirmation = $("new-credential-confirm").value;
   if (!name || !password || password !== confirmation) return status("Enter matching new credentials", true);
+  if (!strongCredentials(name, password)) return status("Use a vault name of 4+ characters and a master password of 12+ characters", true);
   busy(true); status("Creating and verifying the new vault…"); const old = state.keys;
   try {
     if (name === old.name && password === old.password) throw Error("Choose a different credential");
