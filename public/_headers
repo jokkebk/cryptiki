@@ -5,7 +5,7 @@
   Cache-Control: no-store
 
 /index.html
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-VTVLqPT4lJBhd+nNPhHfvIhCJRFxlWD2WWnqZzDmmKM='; style-src 'sha256-fCXvyGF6toz6OODJ8f0k+cENpYxMNXp2oRfYokgVYbI='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-BlAI7AwCL0bgSYIdP/AWRMwkgxbxU/hT5bI+SZlzLjk='; style-src 'sha256-6QNmmqf1i1GFhlT0lroydYA/HhuW5sb6lfCTk5hLVHo='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 
 /api/*
   Cache-Control: no-store
