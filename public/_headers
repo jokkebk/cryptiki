@@ -4,6 +4,9 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Cache-Control: no-store
 
+/
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-BlAI7AwCL0bgSYIdP/AWRMwkgxbxU/hT5bI+SZlzLjk='; style-src 'sha256-6QNmmqf1i1GFhlT0lroydYA/HhuW5sb6lfCTk5hLVHo='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
 /index.html
   Content-Security-Policy: default-src 'none'; script-src 'sha256-BlAI7AwCL0bgSYIdP/AWRMwkgxbxU/hT5bI+SZlzLjk='; style-src 'sha256-6QNmmqf1i1GFhlT0lroydYA/HhuW5sb6lfCTk5hLVHo='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 

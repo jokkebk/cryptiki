@@ -3,9 +3,11 @@ import { createHash } from "node:crypto";
 
 const headersUrl = new URL("../public/_headers", import.meta.url);
 
-/** Routes served from each assembled page; every route pins the page's inline hashes. */
+/** Routes served from each assembled page; every route pins the page's inline hashes.
+    Workers Assets serves a matching file without invoking the worker and matches header
+    rules on the request path, so the path visitors actually use has to be listed too. */
 export const routes = {
-  "index.html": ["/index.html"],
+  "index.html": ["/", "/index.html"],
   "migrate.html": ["/legacy-migration", "/legacy-migration/", "/migrate"],
 };
 
