@@ -203,7 +203,7 @@ export default {
       if (url.pathname.startsWith("/api/vaults/")) return api(request, env, url.pathname.slice(12));
       if (url.pathname.startsWith("/api/")) return new Response("Not found", { status: 404, headers: headers(request.headers.get("Origin") || "", request.url) });
       if (request.method !== "GET" && request.method !== "HEAD") return new Response("Not found", { status: 404 });
-      const assetPath = url.pathname === "/" ? "/index.html" : (url.pathname === "/legacy-migration" || url.pathname === "/legacy-migration/") ? "/migrate" : url.pathname;
+      const assetPath = (url.pathname === "/" || url.pathname === "/index.html") ? "/" : (url.pathname === "/legacy-migration" || url.pathname === "/legacy-migration/") ? "/migrate" : url.pathname;
       const assetUrl = new URL(assetPath, request.url);
       const assetRequest = new Request(assetUrl, request);
       const response = await env.ASSETS.fetch(assetRequest);

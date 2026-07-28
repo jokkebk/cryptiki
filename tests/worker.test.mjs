@@ -112,7 +112,7 @@ test("scheduled cleanup deletes expired capsules", async () => {
 });
 
 test("plain HTTP redirects to HTTPS and unknown paths land on the app", async () => {
-  const e = { DB: new DB(), ASSETS: { fetch: url => new Response(new URL(url.url).pathname === "/index.html" ? "app" : null, { status: new URL(url.url).pathname === "/index.html" ? 200 : 404 }) } };
+  const e = { DB: new DB(), ASSETS: { fetch: url => new Response(new URL(url.url).pathname === "/" ? "app" : null, { status: new URL(url.url).pathname === "/" ? 200 : 404 }) } };
   const insecure = await worker.fetch(new Request("http://cryptiki.com/"), e);
   assert.equal(insecure.status, 301); assert.equal(insecure.headers.get("Location"), "https://cryptiki.com/");
   const insecurePost = await worker.fetch(new Request("http://cryptiki.com/api/vaults/" + id, { method: "POST" }), e);
