@@ -3,7 +3,6 @@ const MAX_BODY = 180 * 1024;
 const MAX_RECOVERY_BODY = 1024;
 const ID_RE = /^[0-9a-f]{32}$/;
 const LOOKUP_ID_RE = /^[0-9a-f]{32}$/;
-const ASSET_VERSION = "e89c024660c8e93e35c1e9074473d4b4a868e5ec5a2f27745482ac862ec62ebd";
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
 const HSTS = "max-age=31536000; includeSubDomains";
 
@@ -206,7 +205,6 @@ export default {
       if (request.method !== "GET" && request.method !== "HEAD") return new Response("Not found", { status: 404 });
       const assetPath = url.pathname === "/" ? "/index.html" : (url.pathname === "/legacy-migration" || url.pathname === "/legacy-migration/") ? "/migrate" : url.pathname;
       const assetUrl = new URL(assetPath, request.url);
-      assetUrl.searchParams.set("v", ASSET_VERSION);
       const assetRequest = new Request(assetUrl, request);
       const response = await env.ASSETS.fetch(assetRequest);
       /* Stale links (old /new.html and friends) land on the app instead of a typeless 404 the browser downloads. */
