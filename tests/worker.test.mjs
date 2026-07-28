@@ -58,3 +58,15 @@ test("legacy recovery is read-only, opaque, expiring, and non-enumerable", async
   assert.equal((await worker.fetch(recover("GET", null), e)).status, 405);
   assert.equal((await worker.fetch(recover("POST", { lookupId }, { "Content-Type": "text/plain" }), e)).status, 404);
 });
+
+test("plain HTTP redirects to HTTPS and unknown paths land on the app", async () => {
+  const e = { DB: new DB(), ASSETS: { fetch: url => new Response(new URL(url.url).pathname === "/index.html" ? "app" : null, { status: new URL(url.url).pathname === "/index.html" ? 200 : 404 }) } };
+  const insecure = await worker.fetch(new Request("http://cryptiki.com/"), e);
+  assert.equal(insecure.status, 301); assert.equal(insecure.headers.get("Location"), "https://cryptiki.com/");
+  const insecurePost = await worker.fetch(new Request("http://cryptiki.com/api/vaults/" + id, { method: "POST" }), e);
+  assert.equal(insecurePost.status, 308);
+  const stale = await worker.fetch(new Request("https://cryptiki.com/new.html"), e);
+  assert.equal(stale.status, 302); assert.equal(stale.headers.get("Location"), "https://cryptiki.com/");
+  const root = await worker.fetch(new Request("https://cryptiki.com/"), e);
+  assert.equal(root.status, 200); assert.equal(root.headers.get("Strict-Transport-Security"), "max-age=31536000; includeSubDomains");
+});

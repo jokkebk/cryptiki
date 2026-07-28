@@ -5,11 +5,13 @@ const ID_RE = /^[0-9a-f]{32}$/;
 const LOOKUP_ID_RE = /^[0-9a-f]{32}$/;
 const ASSET_VERSION = "e89c024660c8e93e35c1e9074473d4b4a868e5ec5a2f27745482ac862ec62ebd";
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
+const HSTS = "max-age=31536000; includeSubDomains";
 
 function headers(origin, requestUrl = "") {
   const h = new Headers(JSON_HEADERS);
   h.set("Cache-Control", "no-store");
   h.set("X-Content-Type-Options", "nosniff");
+  h.set("Strict-Transport-Security", HSTS);
   const sameOrigin = requestUrl && origin === new URL(requestUrl).origin;
   if (origin === "null" || sameOrigin || origin === "https://cryptiki.com") {
     h.set("Access-Control-Allow-Origin", origin);
@@ -153,6 +155,12 @@ function toB64(bytes) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    /* Crypto APIs need a secure context, so plain HTTP is never usable here. */
+    if (url.protocol === "http:") {
+      url.protocol = "https:";
+      const permanent = request.method === "GET" || request.method === "HEAD";
+      return new Response(null, { status: permanent ? 301 : 308, headers: { Location: url.toString() } });
+    }
     if (url.pathname === "/api/legacy/recover") return recoverLegacy(request, env);
     if (url.pathname.startsWith("/api/vaults/")) return api(request, env, url.pathname.slice(12));
     if (request.method !== "GET" && request.method !== "HEAD") return new Response("Not found", { status: 404 });
@@ -161,8 +169,11 @@ export default {
     assetUrl.searchParams.set("v", ASSET_VERSION);
     const assetRequest = new Request(assetUrl, request);
     const response = await env.ASSETS.fetch(assetRequest);
+    /* Stale links (old /new.html and friends) land on the app instead of a typeless 404 the browser downloads. */
+    if (response.status === 404) return new Response(null, { status: 302, headers: { Location: new URL("/", request.url).toString(), "Cache-Control": "no-store" } });
     const h = new Headers(response.headers);
     h.set("Cache-Control", "no-store");
+    h.set("Strict-Transport-Security", HSTS);
     return new Response(response.body, { status: response.status, headers: h });
   }
 };
