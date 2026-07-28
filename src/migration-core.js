@@ -225,4 +225,12 @@ async function boundedStream(input, transform, maxBytes) {
   const out = new Uint8Array(total); let at = 0; for (const chunk of chunks) { out.set(chunk, at); at += chunk.byteLength; } return out;
 }
 
+/* The single definition of v3 credential strength, shared by the vault client and the migration
+   page so a recovered vault cannot be created under weaker rules than a fresh one. */
+export function strongCredentials(name, password) {
+  return typeof name === "string" && typeof password === "string" &&
+    name.length >= 4 && password.length >= 12 && name.length + password.length >= 24;
+}
+export const CREDENTIAL_RULE = "Use a vault name of 4+ characters and a master password of 12+ characters";
+
 export { CAPSULE_AAD, MAX_CONTENT, MAX_ENTRIES, MAX_STRING, V2_ITER, V2_SALT };

@@ -8,12 +8,22 @@ const MAX_STRING = 16 * 1024;
 const MAX_DOCUMENT_BYTES = 512 * 1024;
 const MAX_BLOB = 128 * 1024;
 const $ = id => document.getElementById(id);
+/* Captured while the document is still exactly as served, before vault data can reach the DOM, so
+   "Save this app" cannot carry a rendered secret out with it. */
+const PRISTINE_HTML = `<!doctype html>\n${document.documentElement.outerHTML}`;
 const text = value => typeof value === "string" ? value : "";
 const bytes = value => value instanceof Uint8Array ? value : new Uint8Array(value);
 const cat = (...parts) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let at = 0; for (const p of parts) { out.set(p, at); at += p.length; } return out; };
 const hex = value => [...value].map(x => x.toString(16).padStart(2, "0")).join("");
 const b64 = value => { let s = ""; for (let i = 0; i < value.length; i += 0x8000) s += String.fromCharCode(...value.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
-const unb64 = value => { const s = value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4); const raw = atob(s); return Uint8Array.from(raw, c => c.charCodeAt(0)); };
+/* Syntax and size are checked on the encoded string, so an oversized paste never reaches atob(). */
+const unb64 = (value, max = MAX_BLOB) => {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_-]+$/.test(value) || value.length % 4 === 1) throw Error("Invalid encoded data");
+  if (Math.floor(value.length / 4) * 3 > max) throw Error("Encoded value is too large");
+  const raw = atob(value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4));
+  if (raw.length > max) throw Error("Encoded value is too large");
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+};
 
 async function sha(value) { return bytes(await crypto.subtle.digest("SHA-256", value)); }
 async function hkdf(key, salt, info) {
@@ -74,10 +84,12 @@ async function decrypt(blob, key) {
   return validDocument(JSON.parse(dec.decode(await streamBytes(compressed, DecompressionStream.bind(null, "deflate-raw"), MAX_DOCUMENT_BYTES))));
 }
 function emptyDocument() { return { format: 1, entries: [] }; }
+/* Kept identical to strongCredentials() in src/migration-core.js; tests assert the two agree. */
 function strongCredentials(name, password) { return name.length >= 4 && password.length >= 12 && name.length + password.length >= 24; }
+const CREDENTIAL_RULE = "Use a vault name of 4+ characters and a master password of 12+ characters";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*-_";
-const state = { keys: null, doc: null, rev: 0, dirty: false, lockTimer: 0, hiddenAt: 0, showAll: false, fresh: new Set(), openNotes: new Set(), rotation: null };
+const state = { keys: null, doc: null, rev: 0, dirty: false, lockTimer: 0, showAll: false, fresh: new Set(), openNotes: new Set(), rotation: null };
 function status(message, error = false) { $("status").textContent = message; $("status").className = error ? "error" : ""; }
 function busy(value) { document.body.classList.toggle("busy", value); $("unlock").disabled = value; $("create").disabled = value; }
 function showEditor(value) { $("unlock-screen").hidden = value; $("editor-screen").hidden = !value; }
@@ -91,6 +103,7 @@ function lock() {
   $("retry-old-delete").hidden = true;
   state.showAll = false; state.fresh.clear(); state.openNotes.clear();
   for (const id of ["name", "master-password", "create-confirm", "search"]) $(id).value = "";
+  clearCredentialFields(); $("credential-dialog").close();
   showEditor(false); renderEntries(); status("Locked"); $("name").focus();
 }
 function markDirty() { state.dirty = true; $("save").textContent = "Save changes"; status("Unsaved changes", false); $("status").className = "warn"; touch(); }
@@ -228,7 +241,7 @@ async function api(method, path, headers = {}, body) {
 async function unlock(create) {
   const name = $("name").value.trim(), password = $("master-password").value;
   if (!name || !password) return status("Enter a vault name and master password", true);
-  if (create && !strongCredentials(name, password)) return status("Use a vault name of 4+ characters and a master password of 12+ characters", true);
+  if (create && !strongCredentials(name, password)) return status(CREDENTIAL_RULE, true);
   busy(true); status("Deriving key (this takes a moment)…");
   try {
     const keys = await derive(name, password, p => { $("progress").value = p; }); state.keys = keys;
@@ -246,7 +259,8 @@ async function saveVault() {
   try {
     const blob = await encrypt(state.doc, state.keys.encKey);
     const response = state.rev ? await api("PUT", state.keys.id, { "If-Match": String(state.rev) }, { blob: b64(blob) }) : await api("POST", state.keys.id, { "If-None-Match": "*" }, { blob: b64(blob) });
-    if (response.status === 409) return showConflict(blob);
+    /* Hand the conflict path the document, not the ciphertext: exportVault re-encrypts it. */
+    if (response.status === 409) return showConflict(JSON.parse(JSON.stringify(state.doc)));
     if (!response.ok) throw Error(response.status === 400 ? "Vault document is too large or invalid" : "Save failed");
     state.rev = (await response.json()).rev; state.dirty = false; state.fresh.clear();
     status(`Saved revision ${state.rev}`); $("save").textContent = "Save"; renderEntries();
@@ -261,43 +275,67 @@ async function copySecret(value, source, label) {
   if (!value) return toast(`No ${label.toLowerCase()} to copy`);
   try {
     await navigator.clipboard.writeText(value);
-    toast(`${label} copied — best-effort clipboard clear in 15 s`);
+    /* No timed clear: a background tab cannot reliably write the clipboard, so promising one was
+       worse than saying nothing. The clipboard is the user's to clear. */
+    toast(`${label} copied — clear your clipboard when you are done`);
     if (source) {
       const use = source.querySelector("use"); use.setAttribute("href", "#i-check"); source.classList.add("ok");
       setTimeout(() => { use.setAttribute("href", "#i-copy"); source.classList.remove("ok"); }, 1200);
     }
-    setTimeout(async () => { try { if (navigator.clipboard.readText && await navigator.clipboard.readText() === value) await navigator.clipboard.writeText(""); } catch {} }, 15000);
   } catch { status("Clipboard unavailable", true); }
 }
 function download(name, content) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([content], { type: "application/octet-stream" })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
-async function exportVault(doc = state.doc, filename = "cryptiki-v3-export.json") { const salt = crypto.getRandomValues(new Uint8Array(16)); const key = await hkdf(state.keys.root, salt, enc.encode("cryptiki.v3.export")); const blob = await encrypt(doc, key); download(filename, JSON.stringify({ format: 1, salt: b64(salt), blob: b64(blob) }, null, 2)); }
+/* Always call as exportVault() — bound straight to a click, the Event would arrive as `doc`. */
+async function exportVault(doc = state.doc, filename = "cryptiki-v3-export.json") {
+  if (!state.keys || !doc) return status("Nothing to export", true);
+  try {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const blob = await encrypt(doc, await hkdf(state.keys.root, salt, enc.encode("cryptiki.v3.export")));
+    download(filename, JSON.stringify({ format: 1, salt: b64(salt), blob: b64(blob) }, null, 2)); status(`Encrypted export written to ${filename}`);
+  } catch (error) { status(error.message || "Export failed", true); }
+}
 async function importVault() { const raw = prompt("Paste a Cryptiki v3 export JSON"); if (!raw) return; try { const data = JSON.parse(raw); if (data?.format !== 1) throw Error(); const salt = unb64(data.salt); if (salt.length !== 16) throw Error(); const key = await hkdf(state.keys.root, salt, enc.encode("cryptiki.v3.export")); state.doc = await decrypt(unb64(data.blob), key); state.fresh.clear(); state.openNotes.clear(); markDirty(); renderEntries(); status("Imported; save to sync"); } catch { status("Import failed or export credentials differ", true); } }
+function clearCredentialFields() { for (const id of ["new-credential-name", "new-credential-password", "new-credential-confirm"]) $(id).value = ""; }
 async function changeCredentials() {
-  $("credential-dialog").showModal(); $("new-credential-name").value = state.keys.name; $("new-credential-password").value = ""; $("new-credential-confirm").value = ""; $("new-credential-password").focus();
+  clearCredentialFields(); $("credential-dialog").showModal(); $("new-credential-name").value = state.keys.name; $("new-credential-password").focus();
 }
 async function rotateCredentials(event) {
   event.preventDefault(); const name = $("new-credential-name").value.trim(), password = $("new-credential-password").value, confirmation = $("new-credential-confirm").value;
   if (!name || !password || password !== confirmation) return status("Enter matching new credentials", true);
-  if (!strongCredentials(name, password)) return status("Use a vault name of 4+ characters and a master password of 12+ characters", true);
+  if (!strongCredentials(name, password)) return status(CREDENTIAL_RULE, true);
   busy(true); status("Creating and verifying the new vault…"); const old = state.keys;
   try {
     if (name === old.name && password === old.password) throw Error("Choose a different credential");
     const next = await derive(name, password); const blob = await encrypt(state.doc, next.encKey);
-    const made = await apiWith("POST", next.id, next.auth, { "If-None-Match": "*" }, { blob: b64(blob) });
-    if (!made.ok && made.status !== 409) throw Error("New vault could not be created");
-    const check = await apiWith("GET", next.id, next.auth); if (!check.ok) throw Error("New vault verification failed");
+    /* A create can commit and lose its response, so the decrypted read-back, not the POST, decides. */
+    let made = null;
+    try { made = await apiWith("POST", next.id, next.auth, { "If-None-Match": "*" }, { blob: b64(blob) }); } catch { /* ambiguous; the read below decides */ }
+    if (made && !made.ok && made.status !== 409) throw Error("New vault could not be created");
+    const check = await apiWith("GET", next.id, next.auth);
+    if (!check.ok) throw Error(check.status === 404 ? "New credentials already identify a different vault" : "New vault verification failed; nothing was deleted");
     const verified = await check.json(); const checkedDoc = await decrypt(unb64(verified.blob), next.encKey);
-    if (JSON.stringify(checkedDoc) !== JSON.stringify(state.doc)) throw Error("New vault verification failed");
-    const removed = await apiWith("DELETE", old.id, old.auth);
-    if (!removed.ok && removed.status !== 204) { state.rotation = { old, next, rev: verified.rev }; $("retry-old-delete").hidden = false; status("New vault verified; delete the old vault to finish rotation", true); return; }
-    state.keys = next; state.rev = verified.rev; state.dirty = false; $("name").value = name; $("retry-old-delete").hidden = true; status("Credentials changed");
-  } catch (error) { status(error.message || "Credential change failed", true); } finally { busy(false); $("credential-dialog").close(); }
+    if (JSON.stringify(checkedDoc) !== JSON.stringify(state.doc)) throw Error("New credentials already identify a different vault");
+    /* Record the pending deletion before issuing it, so a lost response still leaves a retry path. */
+    state.rotation = { old, next, rev: verified.rev }; $("retry-old-delete").hidden = false;
+    if (!await deleteRotationSource()) { status("New vault verified; use “Delete old vault” to finish rotation", true); return; }
+    status("Credentials changed");
+  } catch (error) { status(error.message || "Credential change failed", true); } finally { busy(false); clearCredentialFields(); $("credential-dialog").close(); }
+}
+/* Finishes a pending rotation. A 404 from credentials that unlocked this vault moments ago means an
+   earlier delete already committed, so a lost response resumes instead of stranding the rotation. */
+async function deleteRotationSource() {
+  const pending = state.rotation; if (!pending) return false;
+  let removed = null;
+  try { removed = await apiWith("DELETE", pending.old.id, pending.old.auth); } catch { return false; }
+  if (!removed.ok && removed.status !== 204 && removed.status !== 404) return false;
+  state.keys = pending.next; state.rev = pending.rev; state.dirty = false; state.rotation = null;
+  $("name").value = pending.next.name; $("retry-old-delete").hidden = true; return true;
 }
 async function retryOldDeletion() {
-  const pending = state.rotation; if (!pending) return;
+  if (!state.rotation) return;
   busy(true); status("Deleting the old vault…");
-  try { const removed = await apiWith("DELETE", pending.old.id, pending.old.auth); if (!removed.ok && removed.status !== 204) throw Error("Old vault deletion failed; retry later"); state.keys = pending.next; state.rev = pending.rev; state.rotation = null; $("name").value = pending.next.name; $("retry-old-delete").hidden = true; status("Credentials changed; old vault deleted"); }
-  catch (error) { status(error.message, true); } finally { busy(false); }
+  try { const done = await deleteRotationSource(); status(done ? "Credentials changed; old vault deleted" : "Old vault deletion failed; retry later", !done); }
+  finally { busy(false); }
 }
 async function deleteCurrentVault() {
   if (!state.keys || prompt("Type DELETE to permanently remove this vault") !== "DELETE") return;
@@ -306,20 +344,10 @@ async function deleteCurrentVault() {
   catch (error) { status(error.message, true); } finally { busy(false); }
 }
 async function apiWith(method, id, auth, headers = {}, body) { const h = new Headers(headers); h.set("Authorization", `Bearer ${b64(auth)}`); if (body) h.set("Content-Type", "application/json"); return fetch(`${API}/api/vaults/${id}`, { method, headers: h, body: body && JSON.stringify(body), cache: "no-store" }); }
-/* Serialise a blank copy: rendered rows carry service names in aria-labels, so strip the list first. */
-function saveApp() {
-  const clone = document.documentElement.cloneNode(true);
-  clone.querySelector("#entries").replaceChildren();
-  clone.querySelector("#conflict").setAttribute("hidden", "");
-  clone.querySelector("#editor-screen").setAttribute("hidden", "");
-  clone.querySelector("#unlock-screen").removeAttribute("hidden");
-  for (const el of clone.querySelectorAll("input,textarea")) { el.value = ""; el.defaultValue = ""; el.removeAttribute("value"); }
-  clone.querySelector("#status").textContent = "Locked"; clone.querySelector("#count").textContent = "0 entries"; clone.querySelector("#toast").textContent = ""; clone.querySelector("#page-hash").textContent = "pending";
-  download("cryptiki-v3.html", `<!doctype html>\n${clone.outerHTML}`);
-}
+function saveApp() { download("cryptiki-v3.html", PRISTINE_HTML); }
 function pageHash() { const html = document.documentElement.outerHTML.replace(/(<code id="page-hash">)[^<]*/, "$1"); sha(enc.encode(html)).then(x => $("page-hash").textContent = hex(x)); }
 window.addEventListener("DOMContentLoaded", () => {
-  $("version").textContent = VERSION; $("unlock").onclick = () => unlock(false); $("create").onclick = () => unlock(true); $("lock").onclick = lock; $("new-entry").onclick = newEntry; $("save").onclick = saveVault; $("export").onclick = exportVault; $("import").onclick = importVault; $("change").onclick = changeCredentials; $("save-app").onclick = saveApp; $("delete").onclick = deleteCurrentVault; $("retry-old-delete").onclick = retryOldDeletion; $("cancel-credentials").onclick = () => $("credential-dialog").close(); $("credential-form").addEventListener("submit", rotateCredentials); $("search").oninput = renderEntries; $("dismiss").onclick = () => $("notice").hidden = true; $("name").focus(); pageHash();
+  $("version").textContent = VERSION; $("unlock").onclick = () => unlock(false); $("create").onclick = () => unlock(true); $("lock").onclick = lock; $("new-entry").onclick = newEntry; $("save").onclick = saveVault; $("export").onclick = () => exportVault(); $("import").onclick = importVault; $("change").onclick = changeCredentials; $("save-app").onclick = saveApp; $("delete").onclick = deleteCurrentVault; $("retry-old-delete").onclick = retryOldDeletion; $("cancel-credentials").onclick = () => { clearCredentialFields(); $("credential-dialog").close(); }; $("credential-form").addEventListener("submit", rotateCredentials); $("search").oninput = renderEntries; $("dismiss").onclick = () => $("notice").hidden = true; $("name").focus(); pageHash();
   $("toggle-all").onclick = () => { state.showAll = !state.showAll; renderEntries(); };
   $("clear-search").onclick = () => { $("search").value = ""; $("search").focus(); renderEntries(); };
   /* Theme follows the OS until the user overrides it; nothing is persisted. */
@@ -335,5 +363,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (event.key === "Escape" && $("search").value) { $("search").value = ""; renderEntries(); }
     if (event.key === "Enter") { const top = visibleEntries()[0]; if (top) copySecret(top.password, null, `Password for ${top.service}`); }
   });
-  document.addEventListener("visibilitychange", () => { if (document.hidden) state.hiddenAt = Date.now(); else if (state.hiddenAt && Date.now() - state.hiddenAt > 60_000) lock(); else touch(); }); window.addEventListener("beforeunload", e => { if (state.dirty) { e.preventDefault(); e.returnValue = ""; } });
+  /* A hidden tab locks on its own after a minute rather than waiting for the user to come back. */
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(state.lockTimer); state.lockTimer = setTimeout(lock, 60_000); } else touch(); });
+  window.addEventListener("beforeunload", e => { if (state.dirty) { e.preventDefault(); e.returnValue = ""; } });
 });

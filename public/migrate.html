@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-QLF95iS98EZBfxJpzlXV1gOZwvUOBfYSvm9c71d+IEg='; style-src 'sha256-9eKSNJz0w/o9VM5V1ITHfze7Yps1wZlWevbeyU4dAPQ='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-uCHkaZi6f1A6uw6xgMUw68AiEU41Z1npzRgbJYBI3s0='; style-src 'sha256-9eKSNJz0w/o9VM5V1ITHfze7Yps1wZlWevbeyU4dAPQ='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'">
 <title>Cryptiki legacy migration</title>
 <style>
 :root{font:16px/1.45 system-ui,sans-serif;color:#172033;background:#f5f7fb;--blue:#155eef;--border:#d9e0ec;--muted:#667085}*{box-sizing:border-box}body{margin:0}main{max-width:960px;margin:auto;padding:1rem}.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:1rem;margin:.8rem 0;box-shadow:0 2px 8px #1720330d}h1{font-size:1.35rem;margin:0}h2{font-size:1rem;margin:.1rem 0 .7rem}label{display:grid;gap:.25rem;font-weight:600}input,select,button,.btn{font:inherit}input,select{border:1px solid var(--border);border-radius:8px;padding:.55rem;width:100%}button,.btn{border:1px solid var(--border);border-radius:8px;background:#fff;padding:.55rem .75rem;cursor:pointer}.btn{display:inline-block;color:inherit;text-decoration:none}button:focus,.btn:focus,input:focus,select:focus{outline:3px solid #155eef33;border-color:var(--blue)}button.primary,.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}.row{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap}.grid{display:grid;gap:.7rem}@media(min-width:640px){.grid.two{grid-template-columns:1fr 1fr}}.muted{color:var(--muted);font-size:.9rem}ul{margin:.4rem 0;padding-left:1.25rem}li{margin:.25rem 0}.warning{border-left:4px solid #f79009;background:#fffaeb}.error{border-left:4px solid #b42318;background:#fff1f0;color:#8e1d14}.success{border-left:4px solid #12b76a;background:#ecfdf3}.progress{width:100%;height:.55rem}table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{text-align:left;vertical-align:top;padding:.55rem;border-bottom:1px solid var(--border);white-space:pre-wrap;word-break:break-word}th{background:#f5f7fb}code{word-break:break-all}footer{text-align:center;color:var(--muted);font-size:.8rem;padding:1rem}[hidden]{display:none!important}body.busy button{cursor:wait}.debug{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
@@ -1602,10 +1602,18 @@ async function boundedStream(input, transform, maxBytes) {
   const out = new Uint8Array(total); let at = 0; for (const chunk of chunks) { out.set(chunk, at); at += chunk.byteLength; } return out;
 }
 
+/* The single definition of v3 credential strength, shared by the vault client and the migration
+   page so a recovered vault cannot be created under weaker rules than a fresh one. */
+function strongCredentials(name, password) {
+  return typeof name === "string" && typeof password === "string" &&
+    name.length >= 4 && password.length >= 12 && name.length + password.length >= 24;
+}
+const CREDENTIAL_RULE = "Use a vault name of 4+ characters and a master password of 12+ characters";
+
 
 const API_BASE = (globalThis.MIGRATION_API || (location.protocol === "file:" ? "https://cryptiki.com" : "")).replace(/\/$/, "");
 const DEBUG = new URL(location.href).searchParams.get("debug") === "1";
-const state = { oldPasswordTag: null, entries: null, plaintext: "", format: 0, legacy: null, capsule: null, keys: null, lockTimer: 0, hiddenAt: 0 };
+const state = { oldPasswordTag: null, entries: null, plaintext: "", format: 0, legacy: null, capsule: null, keys: null, lockTimer: 0 };
 const $ = id => document.getElementById(id);
 const recoveryArgon2 = (password, salt, options) => globalThis.argon2idAsync(password, salt, { ...options, onProgress: value => { $("progress").value = value; } });
 
@@ -1720,24 +1728,29 @@ async function createVault(event) {
   event.preventDefault();
   const name = $("new-name").value.trim(), password = $("new-password").value, confirmation = $("confirm-password").value;
   if (!state.entries || !name || !password || password !== confirmation) return status("Enter matching new v3 credentials", true);
+  if (!strongCredentials(name, password)) return status(CREDENTIAL_RULE, true);
   if (state.oldPasswordTag && sameBytes(await passwordTag(password, state.oldPasswordTag.salt), state.oldPasswordTag.digest)) return status("Choose a new master password", true);
   busy(true); $("progress").hidden = false; $("progress").value = 0; status("Creating and verifying the new v3 vault…");
   try {
     const keys = await deriveV3(name, password, recoveryArgon2); state.keys = keys;
     const doc = { format: 1, entries: state.entries.map(value => ({ ...value })) }; const blob = await encryptV3(doc, keys.encKey);
-    const made = await fetch(`${API_BASE}/api/vaults/${keys.id}`, { method: "POST", headers: { ...apiHeaders(keys.auth), "If-None-Match": "*" }, body: JSON.stringify({ blob: b64(blob) }), cache: "no-store" });
-    if (made.status === 409) throw Error("That new vault already exists; choose another name or password");
-    if (!made.ok) throw Error("new vault creation failed");
+    /* A create can commit and lose its response; only the decrypted read-back tells someone else's
+       vault from our own already-committed create. */
+    let made = null;
+    try { made = await fetch(`${API_BASE}/api/vaults/${keys.id}`, { method: "POST", headers: { ...apiHeaders(keys.auth), "If-None-Match": "*" }, body: JSON.stringify({ blob: b64(blob) }), cache: "no-store" }); } catch { /* ambiguous; the read below decides */ }
+    if (made && !made.ok && made.status !== 409) throw Error("new vault creation failed");
     const read = await fetch(`${API_BASE}/api/vaults/${keys.id}`, { method: "GET", headers: apiHeaders(keys.auth), cache: "no-store" });
-    if (!read.ok) throw Error("new vault verification failed");
+    if (!read.ok) throw Error(read.status === 404 ? "That new vault already exists; choose another name or password" : "new vault verification failed");
     const saved = await read.json(); const verified = await decryptV3(unb64(saved.blob), keys.encKey);
-    if (JSON.stringify(verified) !== JSON.stringify(doc)) throw Error("new vault verification failed");
-    let consumed = false;
-    try { const removed = await fetch(`${API_BASE}/api/legacy/recover`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lookupId: state.capsule.lookupId }), cache: "no-store" }); consumed = removed.status === 204; } catch { /* the new vault is already verified; cleanup can be retried operationally */ }
-    clearSensitive(); show("recovery-card", false); show("preview-card", false); show("parse-failure-card", false); show("failure-card", false); show("result-card", true); $("cleanup-status").textContent = consumed ? "The one-time recovery capsule was consumed." : "The new vault is verified, but capsule cleanup could not be confirmed; an operator must remove the capsule."; $("progress").hidden = true; status("Migration complete"); busy(false);
+    if (JSON.stringify(verified) !== JSON.stringify(doc)) throw Error("That new vault already exists; choose another name or password");
+    clearSensitive(); show("recovery-card", false); show("preview-card", false); show("parse-failure-card", false); show("failure-card", false); show("result-card", true); $("cleanup-status").textContent = "Your recovery capsule stays available until the window closes on 2027-01-26, then it is deleted automatically."; $("progress").hidden = true; status("Migration complete"); busy(false);
   } catch (error) {
-    if (error?.message?.includes("already exists")) { clearSensitive(); show("preview-card", false); show("failure-card", true); $("failure").textContent = "The new vault could not be created because those credentials already identify a vault. Start again with a different new name or password."; $("progress").hidden = true; status("Migration failed", true); busy(false); }
-    else genericFailure();
+    $("progress").hidden = true; busy(false);
+    if (error?.message?.includes("already exists")) { clearSensitive(); show("preview-card", false); show("failure-card", true); $("failure").textContent = "The new vault could not be created because those credentials already identify a vault. Start again with a different new name or password."; status("Migration failed", true); return; }
+    /* Anything else is transient. Recovery cost the user a memory-hard derivation and the window is
+       one-shot, so keep the verified entries on screen and let them press Create again; the retry
+       resolves a create that committed without returning. */
+    status("Could not create the new vault. Your recovered entries are still here — try again.", true);
   }
 }
 
@@ -1746,7 +1759,10 @@ function restart() { clearSensitive(); $("failure").textContent = "Check the pag
 
 window.addEventListener("DOMContentLoaded", () => {
   if (DEBUG) debug("debug mode enabled; lookup IDs are shown only as 12-character prefixes");
-  $("recovery-form").addEventListener("submit", recover); $("create-form").addEventListener("submit", createVault); $("clear").addEventListener("click", restart); $("retry").addEventListener("click", restart); $("restart").addEventListener("click", restart); $("lock-preview").addEventListener("click", lockPreview); $("lock-parse").addEventListener("click", lockPreview); $("download-recovered").addEventListener("click", () => downloadText(`cryptiki-recovered-v${state.format}.txt`, state.plaintext)); document.addEventListener("keydown", touch); document.addEventListener("visibilitychange", () => { if (document.hidden) state.hiddenAt = Date.now(); else if (state.hiddenAt && Date.now() - state.hiddenAt > 60_000) lockPreview(); else touch(); }); $("old-name").focus();
+  $("recovery-form").addEventListener("submit", recover); $("create-form").addEventListener("submit", createVault); $("clear").addEventListener("click", restart); $("retry").addEventListener("click", restart); $("restart").addEventListener("click", restart); $("lock-preview").addEventListener("click", lockPreview); $("lock-parse").addEventListener("click", lockPreview); $("download-recovered").addEventListener("click", () => downloadText(`cryptiki-recovered-v${state.format}.txt`, state.plaintext)); document.addEventListener("keydown", touch);
+  /* A hidden tab clears recovered plaintext on its own after a minute. */
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(state.lockTimer); state.lockTimer = setTimeout(lockPreview, 60_000); } else touch(); });
+  $("old-name").focus();
 });
 </script>
 </body>

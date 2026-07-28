@@ -1,6 +1,6 @@
 const API_BASE = (globalThis.MIGRATION_API || (location.protocol === "file:" ? "https://cryptiki.com" : "")).replace(/\/$/, "");
 const DEBUG = new URL(location.href).searchParams.get("debug") === "1";
-const state = { oldPasswordTag: null, entries: null, plaintext: "", format: 0, legacy: null, capsule: null, keys: null, lockTimer: 0, hiddenAt: 0 };
+const state = { oldPasswordTag: null, entries: null, plaintext: "", format: 0, legacy: null, capsule: null, keys: null, lockTimer: 0 };
 const $ = id => document.getElementById(id);
 const recoveryArgon2 = (password, salt, options) => globalThis.argon2idAsync(password, salt, { ...options, onProgress: value => { $("progress").value = value; } });
 
@@ -115,24 +115,29 @@ async function createVault(event) {
   event.preventDefault();
   const name = $("new-name").value.trim(), password = $("new-password").value, confirmation = $("confirm-password").value;
   if (!state.entries || !name || !password || password !== confirmation) return status("Enter matching new v3 credentials", true);
+  if (!strongCredentials(name, password)) return status(CREDENTIAL_RULE, true);
   if (state.oldPasswordTag && sameBytes(await passwordTag(password, state.oldPasswordTag.salt), state.oldPasswordTag.digest)) return status("Choose a new master password", true);
   busy(true); $("progress").hidden = false; $("progress").value = 0; status("Creating and verifying the new v3 vault…");
   try {
     const keys = await deriveV3(name, password, recoveryArgon2); state.keys = keys;
     const doc = { format: 1, entries: state.entries.map(value => ({ ...value })) }; const blob = await encryptV3(doc, keys.encKey);
-    const made = await fetch(`${API_BASE}/api/vaults/${keys.id}`, { method: "POST", headers: { ...apiHeaders(keys.auth), "If-None-Match": "*" }, body: JSON.stringify({ blob: b64(blob) }), cache: "no-store" });
-    if (made.status === 409) throw Error("That new vault already exists; choose another name or password");
-    if (!made.ok) throw Error("new vault creation failed");
+    /* A create can commit and lose its response; only the decrypted read-back tells someone else's
+       vault from our own already-committed create. */
+    let made = null;
+    try { made = await fetch(`${API_BASE}/api/vaults/${keys.id}`, { method: "POST", headers: { ...apiHeaders(keys.auth), "If-None-Match": "*" }, body: JSON.stringify({ blob: b64(blob) }), cache: "no-store" }); } catch { /* ambiguous; the read below decides */ }
+    if (made && !made.ok && made.status !== 409) throw Error("new vault creation failed");
     const read = await fetch(`${API_BASE}/api/vaults/${keys.id}`, { method: "GET", headers: apiHeaders(keys.auth), cache: "no-store" });
-    if (!read.ok) throw Error("new vault verification failed");
+    if (!read.ok) throw Error(read.status === 404 ? "That new vault already exists; choose another name or password" : "new vault verification failed");
     const saved = await read.json(); const verified = await decryptV3(unb64(saved.blob), keys.encKey);
-    if (JSON.stringify(verified) !== JSON.stringify(doc)) throw Error("new vault verification failed");
-    let consumed = false;
-    try { const removed = await fetch(`${API_BASE}/api/legacy/recover`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lookupId: state.capsule.lookupId }), cache: "no-store" }); consumed = removed.status === 204; } catch { /* the new vault is already verified; cleanup can be retried operationally */ }
-    clearSensitive(); show("recovery-card", false); show("preview-card", false); show("parse-failure-card", false); show("failure-card", false); show("result-card", true); $("cleanup-status").textContent = consumed ? "The one-time recovery capsule was consumed." : "The new vault is verified, but capsule cleanup could not be confirmed; an operator must remove the capsule."; $("progress").hidden = true; status("Migration complete"); busy(false);
+    if (JSON.stringify(verified) !== JSON.stringify(doc)) throw Error("That new vault already exists; choose another name or password");
+    clearSensitive(); show("recovery-card", false); show("preview-card", false); show("parse-failure-card", false); show("failure-card", false); show("result-card", true); $("cleanup-status").textContent = "Your recovery capsule stays available until the window closes on 2027-01-26, then it is deleted automatically."; $("progress").hidden = true; status("Migration complete"); busy(false);
   } catch (error) {
-    if (error?.message?.includes("already exists")) { clearSensitive(); show("preview-card", false); show("failure-card", true); $("failure").textContent = "The new vault could not be created because those credentials already identify a vault. Start again with a different new name or password."; $("progress").hidden = true; status("Migration failed", true); busy(false); }
-    else genericFailure();
+    $("progress").hidden = true; busy(false);
+    if (error?.message?.includes("already exists")) { clearSensitive(); show("preview-card", false); show("failure-card", true); $("failure").textContent = "The new vault could not be created because those credentials already identify a vault. Start again with a different new name or password."; status("Migration failed", true); return; }
+    /* Anything else is transient. Recovery cost the user a memory-hard derivation and the window is
+       one-shot, so keep the verified entries on screen and let them press Create again; the retry
+       resolves a create that committed without returning. */
+    status("Could not create the new vault. Your recovered entries are still here — try again.", true);
   }
 }
 
@@ -141,5 +146,8 @@ function restart() { clearSensitive(); $("failure").textContent = "Check the pag
 
 window.addEventListener("DOMContentLoaded", () => {
   if (DEBUG) debug("debug mode enabled; lookup IDs are shown only as 12-character prefixes");
-  $("recovery-form").addEventListener("submit", recover); $("create-form").addEventListener("submit", createVault); $("clear").addEventListener("click", restart); $("retry").addEventListener("click", restart); $("restart").addEventListener("click", restart); $("lock-preview").addEventListener("click", lockPreview); $("lock-parse").addEventListener("click", lockPreview); $("download-recovered").addEventListener("click", () => downloadText(`cryptiki-recovered-v${state.format}.txt`, state.plaintext)); document.addEventListener("keydown", touch); document.addEventListener("visibilitychange", () => { if (document.hidden) state.hiddenAt = Date.now(); else if (state.hiddenAt && Date.now() - state.hiddenAt > 60_000) lockPreview(); else touch(); }); $("old-name").focus();
+  $("recovery-form").addEventListener("submit", recover); $("create-form").addEventListener("submit", createVault); $("clear").addEventListener("click", restart); $("retry").addEventListener("click", restart); $("restart").addEventListener("click", restart); $("lock-preview").addEventListener("click", lockPreview); $("lock-parse").addEventListener("click", lockPreview); $("download-recovered").addEventListener("click", () => downloadText(`cryptiki-recovered-v${state.format}.txt`, state.plaintext)); document.addEventListener("keydown", touch);
+  /* A hidden tab clears recovered plaintext on its own after a minute. */
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(state.lockTimer); state.lockTimer = setTimeout(lockPreview, 60_000); } else touch(); });
+  $("old-name").focus();
 });
