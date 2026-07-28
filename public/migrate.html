@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-b0dU+JhaixUUcyvuoevUABmV4aCse+2les/lH9nlyQs='; style-src 'sha256-9eKSNJz0w/o9VM5V1ITHfze7Yps1wZlWevbeyU4dAPQ='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'">
 <title>Cryptiki legacy migration</title>
 <style>
 :root{font:16px/1.45 system-ui,sans-serif;color:#172033;background:#f5f7fb;--blue:#155eef;--border:#d9e0ec;--muted:#667085}*{box-sizing:border-box}body{margin:0}main{max-width:960px;margin:auto;padding:1rem}.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:1rem;margin:.8rem 0;box-shadow:0 2px 8px #1720330d}h1{font-size:1.35rem;margin:0}h2{font-size:1rem;margin:.1rem 0 .7rem}label{display:grid;gap:.25rem;font-weight:600}input,select,button,.btn{font:inherit}input,select{border:1px solid var(--border);border-radius:8px;padding:.55rem;width:100%}button,.btn{border:1px solid var(--border);border-radius:8px;background:#fff;padding:.55rem .75rem;cursor:pointer}.btn{display:inline-block;color:inherit;text-decoration:none}button:focus,.btn:focus,input:focus,select:focus{outline:3px solid #155eef33;border-color:var(--blue)}button.primary,.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}.row{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap}.grid{display:grid;gap:.7rem}@media(min-width:640px){.grid.two{grid-template-columns:1fr 1fr}}.muted{color:var(--muted);font-size:.9rem}ul{margin:.4rem 0;padding-left:1.25rem}li{margin:.25rem 0}.warning{border-left:4px solid #f79009;background:#fffaeb}.error{border-left:4px solid #b42318;background:#fff1f0;color:#8e1d14}.success{border-left:4px solid #12b76a;background:#ecfdf3}.progress{width:100%;height:.55rem}table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{text-align:left;vertical-align:top;padding:.55rem;border-bottom:1px solid var(--border);white-space:pre-wrap;word-break:break-word}th{background:#f5f7fb}code{word-break:break-all}footer{text-align:center;color:var(--muted);font-size:.8rem;padding:1rem}[hidden]{display:none!important}body.busy button{cursor:wait}.debug{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
@@ -9,17 +9,18 @@
 </head>
 <body>
 <main>
-<header class="card"><h1>Cryptiki legacy migration</h1><p class="muted">Temporary, client-side recovery for Cryptiki v1/v2. The old password and recovered text stay in this browser.</p></header>
-<section class="card warning"><strong>Recovery window closes 2027-01-26</strong><p>Previous Cryptiki versions had several security issues:</p><ul><li>v1 stored the password hash in a format (SHA-256) that modern hardware cracks fast.</li><li>v2 kept the password hash in the server database — and that hash was also the key to the user's vault data. The hash itself was never exposed to outside users directly.</li><li>Both had an SQL injection flaw which, combined with the above, risked extraction of most v1 data (except very long passwords) and all v2 data.</li></ul><p>The service has been fairly obscure and not an interesting attack target, and chaining the crypto weaknesses with SQL injection would (in the pre-AI era) have taken dedicated human effort. Still, I wanted the v1 and v2 data offline as soon as possible. Legacy data is now encapsulated in a properly secured fashion, making brute forcing (and SQL injection) as hard as against the native v3 implementation.</p><p>Use this tool to safely recover your data before the recovery window closes. Afterwards you can copy the recovered entries somewhere safer, or create a fresh v3 vault with a new master password — either way, rotate any important password you recover.</p><p class="muted">This tool never sends the page name or password. It sends only an opaque, memory-hard capsule lookup identifier.</p></section>
+<header class="card"><h1>Cryptiki legacy migration</h1><p class="muted">Temporary, client-side recovery for Cryptiki v1/v2. The old password and recovered text stay in this browser; clearing is best effort because browser memory cannot be reliably wiped.</p></header>
+<section class="card warning"><strong>Recovery window closes 2027-01-26</strong><p>Previous Cryptiki versions had several security issues:</p><ul><li>v1 stored the password hash in a format (SHA-256) that modern hardware cracks fast.</li><li>v2 kept the password hash in the server database — and that hash was also the key to the user's vault data. The hash itself was never exposed to outside users directly.</li><li>Both had an SQL injection flaw which, combined with the above, risked extraction of most v1 data (except very long passwords) and all v2 data.</li></ul><p>Capsules harden the new capsule store against a new capsule-only database disclosure. They cannot undo a previous disclosure of the legacy database's hashes or plaintext. Treat every recovered credential as potentially compromised and rotate important account passwords.</p><p>Use this tool to recover your data before the window closes. Afterwards create a fresh v3 vault with a new master password and rotate important passwords.</p><p class="muted">This tool never sends the page name or password. It sends only an opaque, memory-hard capsule lookup identifier.</p></section>
 <section id="recovery-card" class="card"><h2>Recover old vault</h2><form id="recovery-form" class="grid two">
-<label>Old page name<input id="old-name" autocomplete="username"></label>
-<label>Old password<input id="old-password" type="password" autocomplete="current-password" required></label>
+<label>Old page name<input id="old-name" autocomplete="off"></label>
+<label>Old password<input id="old-password" type="password" autocomplete="off" required></label>
 <label>Legacy format<select id="legacy-format"><option value="0">Try v1 and v2</option><option value="1">v1</option><option value="2">v2</option></select></label>
 <label>Recovery code (optional)<input id="recovery-code" inputmode="text" autocomplete="off" placeholder="32-byte keyhash, hex"><span class="muted">Use only a row-specific code from offline support.</span></label>
 <div class="row"><button class="primary" id="recover" type="submit">Recover locally</button><button id="clear" type="button">Clear</button></div>
 </form><progress id="progress" class="progress" max="1" value="0" aria-label="Recovery progress" hidden></progress><p id="status" class="muted" aria-live="polite"></p></section>
 <p id="debug-output" class="muted debug" hidden aria-live="polite"></p>
-<section id="preview-card" class="card" hidden><h2>Recovered entries</h2><p class="muted">Review this local preview before creating the new vault. Recovered values are rendered as text, never as HTML.</p><div id="preview"></div><form id="create-form" class="grid two"><label>New v3 vault name<input id="new-name" autocomplete="username" required></label><label>New master password<input id="new-password" type="password" autocomplete="new-password" required></label><label>Confirm new master password<input id="confirm-password" type="password" autocomplete="new-password" required></label><div class="row"><button class="primary" id="create" type="submit">Create fresh v3 vault</button></div></form><p class="muted">The new password must differ from the old password. Creating a new vault does not rotate the passwords stored inside it; change those separately.</p></section>
+<section id="preview-card" class="card" hidden><h2>Recovered entries</h2><p class="muted">Review this local preview before creating the new vault. Passwords are masked by default; use the lock button to clear this page.</p><div id="preview"></div><form id="create-form" class="grid two"><label>New v3 vault name<input id="new-name" autocomplete="off" required></label><label>New master password<input id="new-password" type="password" autocomplete="new-password" required></label><label>Confirm new master password<input id="confirm-password" type="password" autocomplete="new-password" required></label><div class="row"><button class="primary" id="create" type="submit">Create fresh v3 vault</button><button id="lock-preview" type="button">Lock and clear</button></div></form><p class="muted">Creating a new vault does not rotate the passwords stored inside it; change those separately.</p></section>
+<section id="parse-failure-card" class="card warning" hidden><h2>Verified text recovered</h2><p>The password and content hash were correct, but the legacy text could not be safely converted into entries. Download the verified recovered text, then import or review it manually.</p><div class="row"><button id="download-recovered" class="primary" type="button">Download recovered text</button><button id="lock-parse" type="button">Lock and clear</button></div></section>
 <section id="result-card" class="card success" hidden><h2>Migration complete</h2><p>Your recovered entries were verified after being encrypted into a new v3 vault.</p><p><strong>Next step:</strong> rotate the recovered account passwords, especially any credential that was reused or important.</p><div class="row"><a class="btn primary" href="/">Go to Cryptiki front page</a><button id="restart" type="button">Migrate another vault</button></div></section>
 <section id="failure-card" class="card error" hidden><h2>Recovery failed</h2><p id="failure">Check the page name, password, format, or recovery code and try again. The tool intentionally does not reveal which check failed.</p><button id="retry" type="button">Try again</button></section>
 </main>
@@ -1433,8 +1434,8 @@ async function pbkdf2(password, salt) {
   return bytes(await webcrypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", iterations: V2_ITER, salt: bytes(salt) }, imported, 256));
 }
 
-function stringValue(value, label) {
-  if (typeof value !== "string" || value.length > MAX_STRING) throw Error(`invalid ${label}`);
+function stringValue(value, label, max = MAX_STRING) {
+  if (typeof value !== "string" || value.length > max) throw Error(`invalid ${label}`);
   return value;
 }
 function validHash(value) { return typeof value === "string" && /^[0-9a-fA-F]{64}$/.test(value); }
@@ -1553,7 +1554,7 @@ function parseLegacyEntries(plaintext, format) {
     }
     if (line.trim()) {
       if (!current) current = entry("Imported note", "", "", "");
-      current.note = checkText(current.note ? `${current.note}\n${line}` : line, "note");
+      current.note = stringValue(current.note ? `${current.note}\n${line}` : line, "note", MAX_CONTENT);
     }
   }
   return entries;
@@ -1561,8 +1562,11 @@ function parseLegacyEntries(plaintext, format) {
 
 function validV3Document(doc) {
   if (!doc || doc.format !== 1 || !Array.isArray(doc.entries) || doc.entries.length > MAX_ENTRIES) throw Error("invalid v3 document");
+  const ids = new Set();
   for (const value of doc.entries) {
     if (!value || typeof value.id !== "string" || typeof value.service !== "string" || typeof value.username !== "string" || typeof value.password !== "string" || typeof value.note !== "string") throw Error("invalid v3 entry");
+    if (value.id.length > 256 || ids.has(value.id)) throw Error("invalid v3 entry");
+    ids.add(value.id);
     for (const [label, field] of [["service", value.service], ["username", value.username], ["password", value.password], ["note", value.note]]) checkText(field, label);
   }
   return doc;
@@ -1578,7 +1582,7 @@ async function deriveV3(name, password, argon2, progress) {
 
 async function encryptV3(doc, key) {
   validV3Document(doc);
-  const compressed = bytes(await new Response(new Blob([enc.encode(JSON.stringify(doc))]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer());
+  const compressed = await boundedStream(enc.encode(JSON.stringify(doc)), new CompressionStream("deflate-raw"), 128 * 1024 - 29);
   const nonce = webcrypto.getRandomValues(new Uint8Array(12));
   const aes = await webcrypto.subtle.importKey("raw", bytes(key), "AES-GCM", false, ["encrypt"]);
   const ciphertext = bytes(await webcrypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: cat(enc.encode(V3_AAD), Uint8Array.of(1)), tagLength: 128 }, aes, compressed));
@@ -1589,13 +1593,19 @@ async function decryptV3(blob, key) {
   const value = bytes(blob); if (value.length < 29 || value[0] !== 1) throw Error("invalid v3 blob");
   const aes = await webcrypto.subtle.importKey("raw", bytes(key), "AES-GCM", false, ["decrypt"]);
   const compressed = bytes(await webcrypto.subtle.decrypt({ name: "AES-GCM", iv: value.subarray(1, 13), additionalData: cat(enc.encode(V3_AAD), Uint8Array.of(1)), tagLength: 128 }, aes, value.subarray(13)));
-  return validV3Document(JSON.parse(await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text()));
+  return validV3Document(JSON.parse(new TextDecoder().decode(await boundedStream(compressed, new DecompressionStream("deflate-raw"), MAX_CONTENT))));
+}
+
+async function boundedStream(input, transform, maxBytes) {
+  const reader = new Blob([input]).stream().pipeThrough(transform).getReader(); const chunks = []; let total = 0;
+  for (;;) { const { done, value } = await reader.read(); if (done) break; total += value.byteLength; if (total > maxBytes) { await reader.cancel(); throw Error("value too large"); } chunks.push(value); }
+  const out = new Uint8Array(total); let at = 0; for (const chunk of chunks) { out.set(chunk, at); at += chunk.byteLength; } return out;
 }
 
 
 const API_BASE = (globalThis.MIGRATION_API || (location.protocol === "file:" ? "https://cryptiki.com" : "")).replace(/\/$/, "");
 const DEBUG = new URL(location.href).searchParams.get("debug") === "1";
-const state = { oldPassword: "", entries: null, legacy: null, capsule: null, keys: null };
+const state = { oldPasswordTag: null, entries: null, plaintext: "", format: 0, legacy: null, capsule: null, keys: null, lockTimer: 0, hiddenAt: 0 };
 const $ = id => document.getElementById(id);
 const recoveryArgon2 = (password, salt, options) => globalThis.argon2idAsync(password, salt, { ...options, onProgress: value => { $("progress").value = value; } });
 
@@ -1607,21 +1617,26 @@ function debug(message) {
   const output = $("debug-output");
   if (output) { output.hidden = false; output.textContent += `${output.textContent ? "\n" : ""}${line}`; }
 }
-function busy(value) { document.body.classList.toggle("busy", value); for (const id of ["recover", "clear", "create", "retry", "restart"]) if ($(id)) $(id).disabled = value; }
+function busy(value) { document.body.classList.toggle("busy", value); for (const id of ["recover", "clear", "create", "retry", "restart", "lock-preview", "lock-parse"]) if ($(id)) $(id).disabled = value; }
 function wipe(value) {
   if (value instanceof Uint8Array) value.fill(0);
   else if (value && typeof value === "object") for (const child of Object.values(value)) wipe(child);
 }
 function clearSensitive() {
+  clearTimeout(state.lockTimer); state.lockTimer = 0;
   wipe(state.legacy); wipe(state.capsule); wipe(state.keys); wipe(state.entries);
-  state.oldPassword = ""; state.entries = null; state.legacy = null; state.capsule = null; state.keys = null;
+  wipe(state.oldPasswordTag); state.oldPasswordTag = null; state.entries = null; state.plaintext = ""; state.format = 0; state.legacy = null; state.capsule = null; state.keys = null;
   for (const id of ["old-name", "old-password", "recovery-code", "new-name", "new-password", "confirm-password"]) $(id).value = "";
   $("preview")?.replaceChildren();
 }
+function touch() { clearTimeout(state.lockTimer); state.lockTimer = setTimeout(lockPreview, 15 * 60 * 1000); }
+function lockPreview() { clearSensitive(); show("recovery-card", true); show("preview-card", false); show("parse-failure-card", false); show("result-card", false); status("Recovered data cleared", true); busy(false); }
+function sameBytes(a, b) { if (!a || !b || a.length !== b.length) return false; let result = 0; for (let i = 0; i < a.length; i++) result |= a[i] ^ b[i]; return result === 0; }
+async function passwordTag(password, salt) { return sha(cat(salt, new TextEncoder().encode(password))); }
 function show(id, value) { $(id).hidden = !value; }
 function genericFailure() {
   clearSensitive();
-  show("recovery-card", true); show("preview-card", false); show("result-card", false); show("failure-card", true);
+  show("recovery-card", true); show("preview-card", false); show("parse-failure-card", false); show("result-card", false); show("failure-card", true);
   status("Recovery failed", true); busy(false); $("progress").hidden = true;
 }
 function apiHeaders(auth) { return { Authorization: `Bearer ${b64(auth)}`, "Content-Type": "application/json" }; }
@@ -1652,7 +1667,9 @@ async function tryCandidate(format, name, password, recoveryCode) {
   try { plaintext = format === 1 ? await v1Decrypt(capsule.content, password) : await v2Decrypt(capsule.content, material.passhash); } catch (error) { debug(`v${format}: legacy AES failed (${error?.message || "unknown error"})`); return null; }
   if (!await verifyPlaintext(plaintext, capsule.contentHash)) { debug(`v${format}: plaintext hash failed`); return null; }
   debug(`v${format}: plaintext hash passed; parsing entries`);
-  return { format, plaintext, entries: parseLegacyEntries(plaintext, format), material, capsuleMaterial, capsule };
+  let entries = null; let parseError = false;
+  try { entries = parseLegacyEntries(plaintext, format); } catch (error) { parseError = true; debug(`v${format}: recovered plaintext could not be parsed (${error?.message || "unknown error"})`); }
+  return { format, plaintext, entries, parseError, material, capsuleMaterial, capsule };
 }
 
 function renderPreview(entries) {
@@ -1665,7 +1682,12 @@ function renderPreview(entries) {
   const body = document.createElement("tbody");
   for (const value of entries) {
     const row = document.createElement("tr");
-    for (const field of ["service", "username", "password", "note"]) { const cell = document.createElement("td"); cell.textContent = value[field]; row.append(cell); }
+    for (const field of ["service", "username", "password", "note"]) {
+      const cell = document.createElement("td");
+      if (field !== "password") cell.textContent = value[field];
+      else { const input = document.createElement("input"); input.type = "password"; input.value = value[field]; input.readOnly = true; input.autocomplete = "off"; const reveal = document.createElement("button"); reveal.type = "button"; reveal.textContent = "Reveal"; reveal.addEventListener("click", () => { input.type = input.type === "password" ? "text" : "password"; reveal.textContent = input.type === "password" ? "Reveal" : "Mask"; touch(); }); cell.append(input, reveal); }
+      row.append(cell);
+    }
     body.append(row);
   }
   table.append(body); host.append(table);
@@ -1686,9 +1708,11 @@ async function recover(event) {
       if (recovered) break;
     }
     if (!recovered) throw Error("recovery failed");
-    state.oldPassword = password; state.legacy = recovered.material; state.capsule = recovered.capsuleMaterial; state.entries = recovered.entries;
-    $("old-password").value = ""; $("new-name").value = name; renderPreview(state.entries);
-    show("preview-card", true); $("progress").hidden = true; status(`Recovered and verified locally as v${recovered.format}. Choose new credentials.`); busy(false);
+    const tagSalt = crypto.getRandomValues(new Uint8Array(16)); state.oldPasswordTag = { salt: tagSalt, digest: await passwordTag(password, tagSalt) }; state.plaintext = recovered.plaintext; state.format = recovered.format; state.legacy = recovered.material; state.capsule = recovered.capsuleMaterial; state.entries = recovered.entries;
+    $("old-password").value = ""; $("new-name").value = name; $("progress").hidden = true;
+    if (recovered.parseError) { show("parse-failure-card", true); status(`Password verified and v${recovered.format} plaintext recovered, but entry parsing failed`, true); }
+    else { renderPreview(state.entries); show("preview-card", true); status(`Recovered and verified locally as v${recovered.format}. Choose new credentials.`); }
+    touch(); busy(false);
   } catch (error) { debug(`recovery failed (${error?.message || "unknown error"})`); genericFailure(); }
 }
 
@@ -1696,7 +1720,7 @@ async function createVault(event) {
   event.preventDefault();
   const name = $("new-name").value.trim(), password = $("new-password").value, confirmation = $("confirm-password").value;
   if (!state.entries || !name || !password || password !== confirmation) return status("Enter matching new v3 credentials", true);
-  if (password === state.oldPassword) return status("The new master password must differ from the old password", true);
+  if (state.oldPasswordTag && sameBytes(await passwordTag(password, state.oldPasswordTag.salt), state.oldPasswordTag.digest)) return status("Choose a new master password", true);
   busy(true); $("progress").hidden = false; $("progress").value = 0; status("Creating and verifying the new v3 vault…");
   try {
     const keys = await deriveV3(name, password, recoveryArgon2); state.keys = keys;
@@ -1708,18 +1732,19 @@ async function createVault(event) {
     if (!read.ok) throw Error("new vault verification failed");
     const saved = await read.json(); const verified = await decryptV3(unb64(saved.blob), keys.encKey);
     if (JSON.stringify(verified) !== JSON.stringify(doc)) throw Error("new vault verification failed");
-    clearSensitive(); show("recovery-card", false); show("preview-card", false); show("failure-card", false); show("result-card", true); $("progress").hidden = true; status("Migration complete"); busy(false);
+    clearSensitive(); show("recovery-card", false); show("preview-card", false); show("parse-failure-card", false); show("failure-card", false); show("result-card", true); $("progress").hidden = true; status("Migration complete"); busy(false);
   } catch (error) {
     if (error?.message?.includes("already exists")) { clearSensitive(); show("preview-card", false); show("failure-card", true); $("failure").textContent = "The new vault could not be created because those credentials already identify a vault. Start again with a different new name or password."; $("progress").hidden = true; status("Migration failed", true); busy(false); }
     else genericFailure();
   }
 }
 
-function restart() { clearSensitive(); $("failure").textContent = "Check the page name, password, format, or recovery code and try again. The tool intentionally does not reveal which check failed."; show("result-card", false); show("failure-card", false); show("preview-card", false); show("recovery-card", true); status(""); $("old-name").focus(); }
+function downloadText(name, content) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([content], { type: "text/plain" })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+function restart() { clearSensitive(); $("failure").textContent = "Check the page name, password, format, or recovery code and try again. The tool intentionally does not reveal which check failed."; show("result-card", false); show("failure-card", false); show("preview-card", false); show("parse-failure-card", false); show("recovery-card", true); status(""); $("old-name").focus(); }
 
 window.addEventListener("DOMContentLoaded", () => {
   if (DEBUG) debug("debug mode enabled; lookup IDs are shown only as 12-character prefixes");
-  $("recovery-form").addEventListener("submit", recover); $("create-form").addEventListener("submit", createVault); $("clear").addEventListener("click", restart); $("retry").addEventListener("click", restart); $("restart").addEventListener("click", restart); $("old-name").focus();
+  $("recovery-form").addEventListener("submit", recover); $("create-form").addEventListener("submit", createVault); $("clear").addEventListener("click", restart); $("retry").addEventListener("click", restart); $("restart").addEventListener("click", restart); $("lock-preview").addEventListener("click", lockPreview); $("lock-parse").addEventListener("click", lockPreview); $("download-recovered").addEventListener("click", () => downloadText(`cryptiki-recovered-v${state.format}.txt`, state.plaintext)); document.addEventListener("keydown", touch); document.addEventListener("visibilitychange", () => { if (document.hidden) state.hiddenAt = Date.now(); else if (state.hiddenAt && Date.now() - state.hiddenAt > 60_000) lockPreview(); else touch(); }); $("old-name").focus();
 });
 </script>
 </body>

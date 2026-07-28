@@ -4,7 +4,7 @@ import { createCipheriv, createHash, pbkdf2Sync } from "node:crypto";
 import { argon2id } from "../src/vendor/argon2.js";
 import { b64, buildCapsule, decryptCapsule, decryptV3, deriveCapsuleMaterial, deriveLegacy, deriveV3, detectLegacyFormat, encryptV3, hex, parseLegacyEntries, verifyPlaintext, v1Decrypt, v2Decrypt } from "../src/migration-core.js";
 import { convertRows, parseLegacyDump, verifyCapsuleFile } from "../tools/build-legacy-capsules.mjs";
-import { capsuleSql } from "../tools/import-legacy-capsules.mjs";
+import { capsuleManifest, capsuleSql } from "../tools/import-legacy-capsules.mjs";
 
 const enc = new TextEncoder();
 const argon = async (password, salt, options) => argon2id(password, salt, options);
@@ -59,6 +59,12 @@ test("legacy parser accepts a large document while keeping field limits", () => 
   assert.equal(parseLegacyEntries(plaintext, 2).length, 400);
 });
 
+test("v1 free-text notes are recovered instead of discarded at the v3 field limit", () => {
+  const plaintext = `mail: user / pass\n${"x".repeat(20 * 1024)}`;
+  const entries = parseLegacyEntries(plaintext, 1);
+  assert.equal(entries.length, 1); assert.ok(entries[0].note.length > 16 * 1024);
+});
+
 test("capsules are memory-hard, opaque, authenticated, and recover both formats", async () => {
   const created = 1700000000000, expires = created + 1000;
   for (const row of [v1Row, (() => { const v2 = v2Encrypt("[]", "v2 synthetic", "another password"); return { id: 2, keyhash: v2.keyhash, passhash: v2.passhash, contenthash: shaHex(Buffer.from("[]")), content: v2.content, accessed: v1Row.accessed, modified: v1Row.modified }; })()]) {
@@ -82,7 +88,8 @@ test("converter strictly parses, verifies, and emits only import fields", async 
   const output = result.records.map(row => JSON.stringify(row)).join("\n") + "\n";
   assert.equal(verifyCapsuleFile(output, 1).length, 1); assert.deepEqual(result.counts, { v1: 1, v2: 0 });
   assert.doesNotMatch(output, /keyhash|passhash|contenthash|plaintext/);
-  const sqlImport = capsuleSql(output); assert.match(sqlImport, /INSERT INTO legacy_capsules/); assert.doesNotMatch(sqlImport, /keyhash|passhash|contenthash|plaintext/);
+  const sqlImport = capsuleSql(output); assert.match(sqlImport, /INSERT INTO legacy_capsules/); assert.match(sqlImport, /ON CONFLICT\(lookup_id\) DO UPDATE/); assert.doesNotMatch(sqlImport, /keyhash|passhash|contenthash|plaintext/);
+  assert.deepEqual(capsuleManifest(output)[0], { lookup_id: result.records[0].lookup_id, format: 1, bytes: Buffer.from(result.records[0].blob, "base64url").length, sha256: shaHex(Buffer.from(result.records[0].blob, "base64url")) });
   assert.throws(() => parseLegacyDump(sql.replace("CREATE TABLE pages", "CREATE TABLE other"), 1));
 });
 
