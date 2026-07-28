@@ -31,9 +31,11 @@ async function allowed(limiter, key) {
   return !limiter || (await limiter.limit({ key })).success;
 }
 
+/* Null when Cloudflare did not attach an edge identity. Callers must fail closed rather than
+   share one rate-limit bucket between every anonymous caller. */
 function edgeKey(request) {
   const ip = request.headers.get("CF-Connecting-IP");
-  return ip ? `ip:${ip}` : "edge-identity-missing";
+  return ip ? `ip:${ip}` : null;
 }
 
 function validId(id) { return ID_RE.test(id); }
@@ -115,6 +117,7 @@ async function api(request, env, id) {
   if (!validId(id)) return generic(origin, request.url);
   const auth = bearer(request);
   const actor = edgeKey(request);
+  if (!actor) return json({ error: "not available" }, 400, origin, request.url);
   if (!await allowed(env.REQUEST_LIMITER, `api:${actor}`)) return json({ error: "try later" }, 429, origin, request.url);
   if (request.method === "POST") {
     if (!await allowed(env.CREATE_LIMITER, actor)) return json({ error: "try later" }, 429, origin, request.url);
@@ -130,6 +133,10 @@ async function api(request, env, id) {
   }
   if (!auth) return generic(origin, request.url);
   if (!await allowed(env.AUTH_LIMITER, `${actor}:${id}`)) return json({ error: "try later" }, 429, origin, request.url);
+  /* Keyed on the vault alone, so guessing one vault cannot be scaled out across many source
+     addresses. The ceiling is far above human use; an attacker who knows an id can still stall
+     its owner for a minute, which is the accepted trade for capping distributed guessing. */
+  if (!await allowed(env.VAULT_LIMITER, `vault:${id}`)) return json({ error: "try later" }, 429, origin, request.url);
   const current = await findVault(env, id, auth);
   if (!current) return generic(origin, request.url);
   if (request.method === "GET") return json({ rev: current.rev, blob: toB64(new Uint8Array(current.blob)) }, 200, origin, request.url);
@@ -158,8 +165,12 @@ async function api(request, env, id) {
 async function recoverLegacy(request, env) {
   const origin = request.headers.get("Origin") || "";
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: headers(origin, request.url) });
-  if (request.method !== "POST" && request.method !== "DELETE") return json({ error: "method not allowed" }, 405, origin, request.url);
+  /* Read-only on purpose. A lookup ID is only an address, and anyone holding the retired database
+     can derive every one of them, so it must never authorise a write. Capsules are removed by
+     expiry and the scheduled sweep, never by a caller. */
+  if (request.method !== "POST") return json({ error: "method not allowed" }, 405, origin, request.url);
   const actor = edgeKey(request);
+  if (!actor) return json({ error: "not available" }, 400, origin, request.url);
   if (!await allowed(env.REQUEST_LIMITER, `legacy:${actor}`)) return json({ error: "try later" }, 429, origin, request.url);
   if (!await allowed(env.AUTH_LIMITER, `legacy:${actor}`)) return json({ error: "try later" }, 429, origin, request.url);
   if (request.headers.get("Content-Type") !== "application/json") return generic(origin, request.url);
@@ -171,10 +182,6 @@ async function recoverLegacy(request, env) {
   } catch { return generic(origin, request.url); }
   const lookupId = body && body.lookupId;
   if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 1 || !LOOKUP_ID_RE.test(lookupId || "")) return generic(origin, request.url);
-  if (request.method === "DELETE") {
-    await env.DB.prepare("DELETE FROM legacy_capsules WHERE lookup_id = ?1").bind(lookupId).run();
-    return new Response(null, { status: 204, headers: headers(origin, request.url) });
-  }
   const row = await env.DB.prepare("SELECT format, blob FROM legacy_capsules WHERE lookup_id = ?1 AND expires > ?2")
     .bind(lookupId, Date.now()).first();
   if (!row || (row.format !== 1 && row.format !== 2) || !row.blob) return generic(origin, request.url);
@@ -201,7 +208,7 @@ export default {
       }
       if (url.pathname === "/api/legacy/recover") return recoverLegacy(request, env);
       if (url.pathname.startsWith("/api/vaults/")) return api(request, env, url.pathname.slice(12));
-      if (url.pathname.startsWith("/api/")) return new Response("Not found", { status: 404, headers: headers(request.headers.get("Origin") || "", request.url) });
+      if (url.pathname.startsWith("/api/")) return generic(request.headers.get("Origin") || "", request.url);
       if (request.method !== "GET" && request.method !== "HEAD") return new Response("Not found", { status: 404 });
       const assetPath = (url.pathname === "/" || url.pathname === "/index.html") ? "/" : (url.pathname === "/legacy-migration" || url.pathname === "/legacy-migration/") ? "/migrate" : url.pathname;
       const assetUrl = new URL(assetPath, request.url);
@@ -217,7 +224,11 @@ export default {
       return generic(request.headers.get("Origin") || "", request.url);
     }
   },
+  /* A deployment whose database predates migration 0002 has no capsule table; a missing table must
+     not turn the daily sweep into a recurring failure. */
   async scheduled(_event, env) {
-    if (env.DB) await env.DB.prepare("DELETE FROM legacy_capsules WHERE expires <= ?1").bind(Date.now()).run();
+    if (!env.DB) return;
+    try { await env.DB.prepare("DELETE FROM legacy_capsules WHERE expires <= ?1").bind(Date.now()).run(); }
+    catch { /* no capsule table on this deployment */ }
   }
 };

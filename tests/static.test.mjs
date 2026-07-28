@@ -12,7 +12,10 @@ test("standalone deployed code stays local and within the budget", () => {
   assert.doesNotMatch(html, /<(?:script|link)[^>]+(?:src|href)=["']https?:/i);
   assert.doesNotMatch(html, /\b(?:localStorage|sessionStorage|indexedDB)\s*\./);
   assert.doesNotMatch(html, /innerHTML/);
-  assert.ok(html.split("\n").length + worker.split("\n").length < 2100);
+  /* The budget keeps the deployed code small enough to read end to end. Raised from 2100 on
+     2026-07-28 for the audit fixes: bounded decoding, resumable rotation, the per-vault limiter,
+     fail-closed edge identity, and the pristine-snapshot offline copy. Trim before raising again. */
+  assert.ok(html.split("\n").length + worker.split("\n").length < 2150);
   assert.ok(Buffer.byteLength(html) + Buffer.byteLength(worker) < 112 * 1024);
 });
 

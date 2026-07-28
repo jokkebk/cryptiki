@@ -31,7 +31,7 @@ class Stmt {
 }
 const auth = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
 const other = Uint8Array.from({ length: 32 }, (_, i) => i + 2);
-const request = (method, authorization = auth, headers = {}, body) => new Request(`https://preview.example/api/vaults/${id}`, { method, headers: { Origin: "null", ...(authorization && { Authorization: `Bearer ${b64(authorization)}` }), ...headers }, body: body && JSON.stringify(body) });
+const request = (method, authorization = auth, headers = {}, body) => new Request(`https://preview.example/api/vaults/${id}`, { method, headers: { Origin: "null", "CF-Connecting-IP": "203.0.113.1", ...(authorization && { Authorization: `Bearer ${b64(authorization)}` }), ...headers }, body: body && JSON.stringify(body) });
 const env = () => ({ DB: new DB(), ASSETS: { fetch: () => new Response("app") } });
 
 test("create is insert-only and all existing-vault operations authenticate", async () => {
@@ -80,9 +80,14 @@ test("CAS conflicts preserve data and pruning keeps ten revisions", async () => 
 test("legacy recovery is read-only, opaque, expiring, and non-enumerable", async () => {
   const e = env(); const lookupId = "abcdefabcdefabcdefabcdefabcdefab"; const capsule = Uint8Array.from({ length: 30 }, (_, i) => i + 1); capsule[1] = 1;
   e.DB.legacyCapsules.set(lookupId, { format: 1, blob: capsule, expires: Date.now() + 60_000 });
-  const recover = (method, value, extra = {}) => new Request("https://cryptiki.com/api/legacy/recover", { method, headers: { Origin: "null", ...(["POST", "DELETE"].includes(method) && { "Content-Type": "application/json" }), ...extra }, body: value && JSON.stringify(value) });
+  const recover = (method, value, extra = {}) => new Request("https://cryptiki.com/api/legacy/recover", { method, headers: { Origin: "null", "CF-Connecting-IP": "203.0.113.1", ...(method === "POST" && { "Content-Type": "application/json" }), ...extra }, body: value && JSON.stringify(value) });
   const ok = await worker.fetch(recover("POST", { lookupId }), e); assert.equal(ok.status, 200); assert.equal((await ok.json()).format, 1); assert.equal(ok.headers.get("Access-Control-Allow-Origin"), "null");
-  const consumed = await worker.fetch(recover("DELETE", { lookupId }), e); assert.equal(consumed.status, 204); assert.equal(e.DB.legacyCapsules.has(lookupId), false);
+  /* A lookup ID is derivable by anyone holding the retired dump, so it must never authorise a write. */
+  for (const method of ["DELETE", "PUT"]) {
+    const rejected = await worker.fetch(recover(method, { lookupId }, { "Content-Type": "application/json" }), e);
+    assert.equal(rejected.status, 405);
+  }
+  assert.equal(e.DB.legacyCapsules.has(lookupId), true);
   const missing = await worker.fetch(recover("POST", { lookupId: "00000000000000000000000000000000" }), e); assert.equal(missing.status, 404);
   const expired = await worker.fetch(recover("POST", { lookupId }), { ...e, DB: (() => { const db = new DB(); db.legacyCapsules.set(lookupId, { format: 1, blob: capsule, expires: Date.now() - 1 }); return db; })() }); assert.equal(expired.status, 404);
   assert.equal((await worker.fetch(recover("GET", null), e)).status, 405);
@@ -98,7 +103,7 @@ test("legacy recovery keys the limiter on CF-Connecting-IP", async () => {
 
 test("chunked and malformed request bodies are bounded and rejected", async () => {
   const e = env();
-  const oversized = new Request(`https://preview.example/api/vaults/${id}`, { method: "POST", headers: { Origin: "null", Authorization: `Bearer ${b64(auth)}`, "If-None-Match": "*", "Content-Type": "application/json" }, body: JSON.stringify({ blob: b64(new Uint8Array(128 * 1024)) }) });
+  const oversized = new Request(`https://preview.example/api/vaults/${id}`, { method: "POST", headers: { Origin: "null", "CF-Connecting-IP": "203.0.113.1", Authorization: `Bearer ${b64(auth)}`, "If-None-Match": "*", "Content-Type": "application/json" }, body: JSON.stringify({ blob: b64(new Uint8Array(128 * 1024)) }) });
   assert.equal((await worker.fetch(oversized, e)).status, 404);
   const invalidBlob = await worker.fetch(request("POST", auth, { "If-None-Match": "*", "Content-Type": "application/json" }, { blob: b64(Uint8Array.of(1, 2, 3)) }), e);
   assert.equal(invalidBlob.status, 404);
@@ -123,4 +128,65 @@ test("plain HTTP redirects to HTTPS and unknown paths land on the app", async ()
   assert.equal(root.status, 200); assert.equal(root.headers.get("Strict-Transport-Security"), "max-age=31536000; includeSubDomains");
   const apiTypo = await worker.fetch(new Request("https://cryptiki.com/api/typo"), e);
   assert.equal(apiTypo.status, 404);
+});
+
+/* Models Cloudflare's own asset router (html_handling: auto-trailing-slash) rather than a lookup
+   table. The trivial mock this replaces could not express the redirect that took the front page
+   down, because it never redirected. */
+function assetRouter() {
+  const files = new Map([["/index.html", "<!doctype html><html id=\"app\">app</html>"], ["/migrate.html", "<!doctype html><html>migrate</html>"]]);
+  return { fetch: input => {
+    const path = new URL(input.url ?? input).pathname;
+    if (path === "/index.html") return new Response(null, { status: 307, headers: { Location: "/" } });
+    if (path === "/migrate.html") return new Response(null, { status: 307, headers: { Location: "/migrate" } });
+    if (path === "/") return new Response(files.get("/index.html"), { status: 200 });
+    if (path === "/migrate") return new Response(files.get("/migrate.html"), { status: 200 });
+    return new Response(null, { status: 404 });
+  } };
+}
+
+test("no visitor-facing path redirects back into itself", async () => {
+  const e = { DB: new DB(), ASSETS: assetRouter() };
+  /* Follow each entry point the way a browser would; a cycle means the site is unreachable. */
+  for (const entry of ["/", "/index.html", "/migrate", "/legacy-migration", "/legacy-migration/"]) {
+    const seen = new Set(); let path = entry, status = 0;
+    for (let hop = 0; hop < 5; hop++) {
+      assert.equal(seen.has(path), false, `${entry} redirect loop revisiting ${path}`);
+      seen.add(path);
+      const response = await worker.fetch(new Request(`https://cryptiki.com${path}`), e);
+      status = response.status;
+      if (status < 300 || status >= 400) break;
+      path = new URL(response.headers.get("Location"), "https://cryptiki.com").pathname;
+    }
+    assert.equal(status, 200, `${entry} never reached a page (last status ${status})`);
+  }
+});
+
+test("front page and migration page serve their own document", async () => {
+  const e = { DB: new DB(), ASSETS: assetRouter() };
+  assert.match(await (await worker.fetch(new Request("https://cryptiki.com/"), e)).text(), /app/);
+  assert.match(await (await worker.fetch(new Request("https://cryptiki.com/legacy-migration"), e)).text(), /migrate/);
+});
+
+test("a request without edge identity is refused, not pooled into one bucket", async () => {
+  const keys = [];
+  const e = { ...env(), REQUEST_LIMITER: { limit: async ({ key }) => { keys.push(key); return { success: true }; } } };
+  for (const url of [`https://cryptiki.com/api/vaults/${id}`, "https://cryptiki.com/api/legacy/recover"]) {
+    const r = await worker.fetch(new Request(url, { method: "POST", headers: { Origin: "null", "Content-Type": "application/json" }, body: "{}" }), e);
+    assert.equal(r.status, 400);
+  }
+  assert.deepEqual(keys, [], "no rate-limit bucket should be consumed without edge identity");
+});
+
+test("one vault is limited across every source address", async () => {
+  const keys = [];
+  const perVault = { limit: async ({ key }) => { keys.push(key); return { success: false }; } };
+  const e = { ...env(), VAULT_LIMITER: perVault };
+  /* Different IPs, same vault: the actor-scoped limiters would let all of these through. */
+  for (const ip of ["203.0.113.20", "203.0.113.21", "198.51.100.9"]) {
+    const r = await worker.fetch(request("GET", auth, { "CF-Connecting-IP": ip }), e);
+    assert.equal(r.status, 429);
+  }
+  assert.deepEqual(keys, Array(3).fill(`vault:${id}`));
+  assert.equal(e.DB.vaults.size, 0, "the per-vault limit must run before the D1 read");
 });
