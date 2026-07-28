@@ -487,9 +487,8 @@ def verify(format_number: int, page: str, password: str, recovery_code: str, row
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dump", default="/Users/joonas.pihlajamaa/koodi/cryptiki_pages_20260727.sql", type=Path, help="legacy SQL dump (default: the known local dump)")
+    parser.add_argument("--dump", required=True, type=Path, help="legacy SQL dump (kept outside the repository)")
     parser.add_argument("--format", choices=("auto", "1", "2"), default="auto", help="legacy format; auto tries v1 then v2")
-    parser.add_argument("--recovery-code", default="", help="optional 64-hex keyhash from the old page; do not paste it into shared logs")
     parser.add_argument("--capsules", type=Path, help="local capsules.jsonl produced by build-legacy-capsules.mjs")
     parser.add_argument("--url", help="deployment base URL; fetches only the opaque recovery lookup ID")
     parser.add_argument("--node", default="node", help="Node.js executable used for optional Argon2id capsule derivation")
@@ -509,7 +508,7 @@ def main() -> int:
         return 1
     page = input("Old page name (exact spelling; do not add/remove spaces): ")
     password = getpass.getpass("Old password (hidden): ")
-    recovery_code = args.recovery_code or getpass.getpass("Recovery code from the old page, hidden; blank to derive from page name: ").strip()
+    recovery_code = getpass.getpass("Recovery code from the old page, hidden; blank to derive from page name: ").strip()
     formats = [int(args.format)] if args.format != "auto" else [1, 2]
     for format_number in formats:
         result = verify(format_number, page, password, recovery_code, rows, args.capsules, args.url, args.node, args.debug)

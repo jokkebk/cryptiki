@@ -21,7 +21,15 @@ export function inlineHashes(name, html) {
   return { style: hash(style), script: hash(script) };
 }
 
-/** Rewrites the script-src/style-src hashes of a page's routes in public/_headers. */
+export function embedCsp(name, html) {
+  const { style, script } = inlineHashes(name, html);
+  const policy = `default-src 'none'; script-src '${script}'; style-src '${style}'; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'`;
+  const embedded = html.replace('<meta http-equiv="Content-Security-Policy" content="__CSP_META__">', `<meta http-equiv="Content-Security-Policy" content="${policy}">`);
+  if (embedded === html) throw Error(`${name} has no CSP meta placeholder`);
+  return embedded;
+}
+
+/** Rewrites the script/style hashes in headers and embeds the same policy in the page. */
 export function syncCspHashes(name, html) {
   const { style, script } = inlineHashes(name, html);
   const paths = routes[name] ?? throwUnknown(name);
@@ -38,7 +46,7 @@ export function syncCspHashes(name, html) {
   const missing = paths.filter(path => !seen.has(path));
   if (missing.length) throw Error(`public/_headers has no block for ${missing.join(", ")}`);
   writeFileSync(headersUrl, updated.join(""));
-  return { style, script };
+  return embedCsp(name, html);
 }
 
 const throwUnknown = name => { throw Error(`No CSP routes declared for ${name}`); };

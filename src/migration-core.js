@@ -57,8 +57,8 @@ export async function pbkdf2(password, salt) {
   return bytes(await webcrypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", iterations: V2_ITER, salt: bytes(salt) }, imported, 256));
 }
 
-function stringValue(value, label) {
-  if (typeof value !== "string" || value.length > MAX_STRING) throw Error(`invalid ${label}`);
+function stringValue(value, label, max = MAX_STRING) {
+  if (typeof value !== "string" || value.length > max) throw Error(`invalid ${label}`);
   return value;
 }
 function validHash(value) { return typeof value === "string" && /^[0-9a-fA-F]{64}$/.test(value); }
@@ -177,7 +177,7 @@ export function parseLegacyEntries(plaintext, format) {
     }
     if (line.trim()) {
       if (!current) current = entry("Imported note", "", "", "");
-      current.note = checkText(current.note ? `${current.note}\n${line}` : line, "note");
+      current.note = stringValue(current.note ? `${current.note}\n${line}` : line, "note", MAX_CONTENT);
     }
   }
   return entries;
@@ -185,8 +185,11 @@ export function parseLegacyEntries(plaintext, format) {
 
 export function validV3Document(doc) {
   if (!doc || doc.format !== 1 || !Array.isArray(doc.entries) || doc.entries.length > MAX_ENTRIES) throw Error("invalid v3 document");
+  const ids = new Set();
   for (const value of doc.entries) {
     if (!value || typeof value.id !== "string" || typeof value.service !== "string" || typeof value.username !== "string" || typeof value.password !== "string" || typeof value.note !== "string") throw Error("invalid v3 entry");
+    if (value.id.length > 256 || ids.has(value.id)) throw Error("invalid v3 entry");
+    ids.add(value.id);
     for (const [label, field] of [["service", value.service], ["username", value.username], ["password", value.password], ["note", value.note]]) checkText(field, label);
   }
   return doc;
@@ -202,7 +205,7 @@ export async function deriveV3(name, password, argon2, progress) {
 
 export async function encryptV3(doc, key) {
   validV3Document(doc);
-  const compressed = bytes(await new Response(new Blob([enc.encode(JSON.stringify(doc))]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer());
+  const compressed = await boundedStream(enc.encode(JSON.stringify(doc)), new CompressionStream("deflate-raw"), 128 * 1024 - 29);
   const nonce = webcrypto.getRandomValues(new Uint8Array(12));
   const aes = await webcrypto.subtle.importKey("raw", bytes(key), "AES-GCM", false, ["encrypt"]);
   const ciphertext = bytes(await webcrypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: cat(enc.encode(V3_AAD), Uint8Array.of(1)), tagLength: 128 }, aes, compressed));
@@ -213,7 +216,13 @@ export async function decryptV3(blob, key) {
   const value = bytes(blob); if (value.length < 29 || value[0] !== 1) throw Error("invalid v3 blob");
   const aes = await webcrypto.subtle.importKey("raw", bytes(key), "AES-GCM", false, ["decrypt"]);
   const compressed = bytes(await webcrypto.subtle.decrypt({ name: "AES-GCM", iv: value.subarray(1, 13), additionalData: cat(enc.encode(V3_AAD), Uint8Array.of(1)), tagLength: 128 }, aes, value.subarray(13)));
-  return validV3Document(JSON.parse(await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text()));
+  return validV3Document(JSON.parse(new TextDecoder().decode(await boundedStream(compressed, new DecompressionStream("deflate-raw"), MAX_CONTENT))));
 }
 
-export { CAPSULE_AAD, MAX_CONTENT, MAX_ENTRIES, V2_ITER, V2_SALT };
+async function boundedStream(input, transform, maxBytes) {
+  const reader = new Blob([input]).stream().pipeThrough(transform).getReader(); const chunks = []; let total = 0;
+  for (;;) { const { done, value } = await reader.read(); if (done) break; total += value.byteLength; if (total > maxBytes) { await reader.cancel(); throw Error("value too large"); } chunks.push(value); }
+  const out = new Uint8Array(total); let at = 0; for (const chunk of chunks) { out.set(chunk, at); at += chunk.byteLength; } return out;
+}
+
+export { CAPSULE_AAD, MAX_CONTENT, MAX_ENTRIES, MAX_STRING, V2_ITER, V2_SALT };

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cryptiki v3</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="__CSP_META__"><title>Cryptiki v3</title>
 <style>
 /* Light palette: warm paper. Dark palette below. Theme follows the OS; the header
    toggle overrides it for this session only — nothing is written to browser storage. */
@@ -141,7 +141,7 @@ footer{text-align:center;color:var(--ink-3);font-size:.7rem;padding:1rem;word-br
 
 <section id="notice" class="notice"><button class="icon" id="dismiss" aria-label="Dismiss notice"><svg><use href="#i-close"/></svg></button><strong>Cryptiki v1 &amp; v2 retirement notice</strong><p>Previous versions are retired due to separate security issues in both and replaced with hopefully much hardened v3. You can read more and recover / migrate previous version data in the migration tool below.</p><a href="/legacy-migration">Open the migration tool</a></section>
 
-<section id="unlock-screen" class="card"><h2>Unlock or create a vault</h2><div class="grid"><label>Vault name<input id="name" autocomplete="username"></label><label>Master password<input id="master-password" type="password" autocomplete="current-password"></label><progress id="progress" max="1" value="0" aria-label="Unlock progress"></progress><div class="row"><button id="unlock" class="primary">Unlock</button><button id="create">Create new vault</button></div><p class="muted">Nothing is remembered in browser storage. Name, password, plaintext, and keys stay in memory.</p></div></section>
+<section id="unlock-screen" class="card"><h2>Unlock or create a vault</h2><div class="grid"><label>Vault name — a second secret<input id="name" autocomplete="off"></label><label>Master password<input id="master-password" type="password" autocomplete="off"></label><label>Confirm password for a new vault<input id="create-confirm" type="password" autocomplete="off"><span class="muted">Only used when creating a vault; a weak name/password pair can be guessed online.</span></label><progress id="progress" max="1" value="0" aria-label="Unlock progress"></progress><div class="row"><button id="unlock" class="primary">Unlock</button><button id="create">Create new vault</button></div><p class="muted">Nothing is remembered in browser storage. Name, password, plaintext, and keys stay in memory.</p></div></section>
 
 <section id="editor-screen" hidden>
   <div class="finder">
@@ -166,10 +166,11 @@ footer{text-align:center;color:var(--ink-3);font-size:.7rem;padding:1rem;word-br
 
   <div id="conflict" class="card conflict" hidden><strong>Save conflict</strong><p class="muted">Another client has saved this vault. Choose which copy to keep locally.</p><div class="row"><button id="reload-theirs">Reload theirs</button><button id="download-mine">Download mine</button></div></div>
 
-  <div class="tools"><button id="export">Encrypted export</button><button id="import">Encrypted import</button><button id="change">Change vault credentials</button><button id="save-app">Save this app</button></div>
+  <div class="tools"><button id="export">Encrypted export</button><button id="import">Encrypted import</button><button id="change">Change vault credentials</button><button id="retry-old-delete" hidden>Delete old vault</button><button id="delete">Delete vault</button><button id="save-app">Save this app</button></div>
 </section>
 </main>
-<footer>Cryptiki <span id="version"></span> · commit <code>source</code> · page SHA-256 <code id="page-hash">pending</code></footer>
+<dialog id="credential-dialog"><form id="credential-form"><h2>Change vault credentials</h2><label>New vault name<input id="new-credential-name" autocomplete="off" required></label><label>New master password<input id="new-credential-password" type="password" autocomplete="new-password" required></label><label>Confirm new master password<input id="new-credential-confirm" type="password" autocomplete="new-password" required></label><div class="row"><button id="cancel-credentials" type="button">Cancel</button><button class="primary" type="submit">Verify and change</button></div></form></dialog>
+<footer>Cryptiki <span id="version"></span> · build fingerprint <code id="page-hash">pending</code> (not an authenticity proof)</footer>
 <div class="toast" id="toast"></div>
 <script>/* __VENDOR__ */
 /* __CLIENT__ */</script>
