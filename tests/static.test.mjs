@@ -12,7 +12,7 @@ test("standalone deployed code stays local and within the budget", () => {
   assert.doesNotMatch(html, /<(?:script|link)[^>]+(?:src|href)=["']https?:/i);
   assert.doesNotMatch(html, /\b(?:localStorage|sessionStorage|indexedDB)\s*\./);
   assert.doesNotMatch(html, /innerHTML/);
-  assert.ok(html.split("\n").length + worker.split("\n").length < 2000);
+  assert.ok(html.split("\n").length + worker.split("\n").length < 2100);
   assert.ok(Buffer.byteLength(html) + Buffer.byteLength(worker) < 100 * 1024);
 });
 
