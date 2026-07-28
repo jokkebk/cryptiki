@@ -28,12 +28,25 @@ browser strings, DOM copies, and garbage-collected memory cannot be reliably
 zeroed.
 
 The Worker rejects decoded blobs over 128 KiB, bounds request streams even when
-`Content-Length` is absent, and applies separate edge-identity and per-vault
-limits before D1 reads. The edge identity is the trusted
-`CF-Connecting-IP` header; a missing header uses a deliberately conservative
-separate bucket and should be treated as a deployment/configuration error.
-After a verified migration the browser consumes its opaque recovery capsule;
-expired migration capsules are also deleted by the configured daily Worker cron.
+`Content-Length` is absent, and applies three limits before any D1 read: per
+edge identity, per identity-and-vault, and per vault. The edge identity is the
+trusted `CF-Connecting-IP` header, and a request without one is refused rather
+than pooled into a shared bucket, so a missing header fails closed and shows up
+as a deployment error instead of silently disabling rate limiting.
+
+The per-vault limit is what stops guessing against one vault being spread across
+many source addresses. Two residual risks come with it. Cloudflare's limits are
+per location and eventually consistent, so the effective global ceiling is the
+configured limit multiplied by the number of data centres in play; a WAF rule is
+still the operator-side control. And because the limit is keyed on the vault
+alone, someone who learns a vault id can stall that vault's owner for up to a
+minute. That trade is deliberate: capping distributed guessing matters more,
+because a correct guess yields the decryption key outright.
+
+`/api/legacy/recover` is read-only and accepts POST only. A lookup id is an
+address derived from the retired database's own columns, so anyone holding that
+database can derive every lookup id; it must never authorise a write. Capsules
+are removed only by expiry and the daily Worker cron.
 The preview deployment is deliberately separate from `cryptiki.com`.
 
 ## Cryptographic format
@@ -132,9 +145,11 @@ arbitrary middle chunk; rerun the complete set, then compare every row's
 `lookup_id`, format, byte length, and SHA-256 with the private manifest before
 asking users to recover vaults. The raw dump and manifest must stay offline and
 must never enter Git, CI, Cloudflare, or logs. The temporary recovery window
-closes on **2027-01-26**; remove
-`public/migrate.html`, the `/api/legacy/recover` route, and migration 0002 as a
-dated operational task after that window.
+closes on **2027-01-26**. After that window, remove `public/migrate.html` and
+the `/api/legacy/recover` route, and add a new dated forward migration that
+drops `legacy_capsules`. Do not edit or delete `0002_legacy_capsules.sql`:
+applied migrations are immutable history, and removing one leaves already
+migrated databases inconsistent with the migration table.
 
 For a private terminal trace of one recovery attempt, use the standard-library
 diagnostic tool. It reports page lookup, password-hash match, legacy AES

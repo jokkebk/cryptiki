@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { argon2id } from "../src/vendor/argon2.js";
 import { b64, buildCapsule, detectLegacyFormat, hex } from "../src/migration-core.js";
@@ -10,6 +10,15 @@ const SIX_MONTHS = 183 * 24 * 60 * 60 * 1000;
 const nodeArgon2 = async (password, salt, options) => argon2id(password, salt, options);
 
 function fail(message) { throw Error(`legacy dump rejected: ${message}`); }
+
+/* Exclusive create at 0600: refuses an existing path and will not follow a symlink into one, so a
+   capsule file can never overwrite or leak through something already on disk. */
+export function writeSecret(path, content) {
+  let fd;
+  try { fd = openSync(path, "wx", 0o600); }
+  catch (error) { fail(error.code === "EEXIST" ? `output path already exists: ${path}` : `cannot create output: ${error.message}`); }
+  try { writeFileSync(fd, content, { encoding: "utf8" }); } finally { closeSync(fd); }
+}
 
 function unescapeSql(value) {
   return value.replace(/\\([0abtnvfr'"\\%_])/g, (_, code) => ({ "0": "\0", a: "\x07", b: "\b", t: "\t", n: "\n", v: "\v", f: "\f", r: "\r", "'": "'", '"': '"', "\\": "\\", "%": "%", _: "_" }[code]));
@@ -166,8 +175,7 @@ async function main() {
   const converted = await convertRows(rows, created, expires);
   const outputText = converted.records.map(record => JSON.stringify(record)).join("\n") + "\n";
   verifyCapsuleFile(outputText, rows.length);
-  writeFileSync(output, outputText, { encoding: "utf8", mode: 0o600 });
-  chmodSync(output, 0o600);
+  writeSecret(output, outputText);
   const digest = createHash("sha256").update(outputText).digest("hex");
   console.log(`converted ${rows.length} rows (v1: ${converted.counts.v1}, v2: ${converted.counts.v2})`);
   console.log(`capsule output sha256: ${digest}`);

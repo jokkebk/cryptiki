@@ -27,3 +27,44 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.81.0"
           command: deploy --config wrangler.production.jsonc
+  # A green unit suite is not evidence that the deployed site loads: asset routing lives in
+  # Cloudflare, not in the mocks. Fail the run if the front page does not actually serve the app.
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Front page serves the app over HTTPS
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -sS -o body.html -w '%{http_code}' --max-time 20 https://cryptiki.com/ || echo 000)
+            [ "$code" = "200" ] && break
+            echo "attempt $attempt: HTTP $code"; sleep 10
+          done
+          [ "$code" = "200" ] || { echo "front page returned $code"; exit 1; }
+          grep -q 'id="unlock-screen"' body.html || { echo "front page served no app"; exit 1; }
+          grep -q 'argon2idAsync' body.html || { echo "front page served no crypto"; exit 1; }
+      - name: Security headers and migration page
+        run: |
+          set -euo pipefail
+          curl -sSI --max-time 20 https://cryptiki.com/ | tee head.txt
+          grep -qi '^content-security-policy:.*default-src .none.' head.txt
+          grep -qi '^strict-transport-security:' head.txt
+          curl -sS -o /dev/null -w '%{http_code}\n' --max-time 20 https://cryptiki.com/legacy-migration | grep -q '^200$'
+      - name: Recovery endpoint is read-only
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 -X DELETE \
+            -H 'Content-Type: application/json' \
+            --data '{"lookupId":"00000000000000000000000000000000"}' \
+            https://cryptiki.com/api/legacy/recover)
+          [ "$code" = "405" ] || { echo "capsule DELETE is reachable (HTTP $code)"; exit 1; }
+      # The Worker refuses any request Cloudflare did not tag with CF-Connecting-IP. An
+      # unauthenticated vault read must therefore answer 404, not 400: a 400 here means the edge
+      # identity is missing and every API call is being rejected.
+      - name: Edge identity reaches the Worker
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \
+            https://cryptiki.com/api/vaults/00000000000000000000000000000000)
+          [ "$code" = "404" ] || { echo "vault API answered $code; 400 means CF-Connecting-IP is absent"; exit 1; }

@@ -2,7 +2,8 @@
 
 This document records the disposition of `SecurityAuditSol.md` and
 `SecurityAuditOpus.md` for the audited 2026-07-28 revision. Code fixes are
-covered by the repository test suite; actions marked operational require access
+covered by the repository test suite — including, since 2026-07-28,
+`src/client.js` behaviour, which previously had none; actions marked operational require access
 to Cloudflare, GitHub, D1, or private legacy artifacts and must be recorded by
 the operator when completed.
 
@@ -11,16 +12,22 @@ the operator when completed.
 - [x] SA-01 / M2 — creation and credential rotation require confirmation, verify
   the target document, tolerate a retry after an ambiguous create, retain the
   old deletion capability until deletion succeeds, and expose deletion controls.
-- [x] SA-02 / H1 / H2 / M10 — edge IP extraction uses `CF-Connecting-IP`; client
-  and per-vault limits are enforced before D1 reads, including failed auth and
-  recovery; successful operations are also metered.
+- [x] SA-02 / H1 / H2 / M10 — edge IP extraction uses `CF-Connecting-IP` and a
+  request without one is refused rather than pooled into a shared bucket. Three
+  limits run before any D1 read: per identity, per identity-and-vault, and
+  (added 2026-07-28) per vault alone, which is what stops distributed guessing
+  against one target. Residual: Cloudflare limits are per location, and a leaked
+  vault id can stall that vault's owner for up to a minute.
 - [x] H3 — missing or malformed bearer auth returns the generic response and an
   unexpected Worker exception is contained.
 - [x] SA-04 / H4 — both deploy workflows run `npm test`, publish file hashes in
   the job summary, use read-only workflow permissions, immutable action commits,
   and an exact Wrangler version.
 - [x] SA-05 / M5 — expired capsules are deleted by the daily Worker cron and
-  the endpoint/page remain scheduled for retirement at the window deadline.
+  the endpoint/page remain scheduled for retirement at the window deadline. The
+  caller-triggered capsule delete added in this round was removed on 2026-07-28:
+  a lookup id is derivable from the retired database, so it must not authorise a
+  write. Closure adds a new forward migration; `0002` is never edited.
 - [x] SA-06 / M4 — capsule imports reset/upsert rows idempotently, private output
   files are exclusive and mode 0600, output directories are mode 0700, and a
   per-row length/SHA-256 manifest is generated.
@@ -28,9 +35,16 @@ the operator when completed.
   survives parser failure as a downloadable text artifact, and recovered state
   clears after inactivity, hidden-page timeout, manual lock, success, or error.
 - [x] SA-08 — conflict downloads use the same encrypted export schema and round
-  trip through the normal import path.
+  trip through the normal import path. Both export paths were in fact broken
+  until 2026-07-28 (the button passed a click `Event`, the conflict path passed
+  ciphertext, and both threw unhandled); fixed, with errors surfaced in the UI
+  and `tests/client.test.mjs` covering the round trip.
 - [x] SA-09 / M7 — HSTS, asset routing through the Worker, security headers, and
   embedded CSP are source-controlled; assembled pages and headers are checked.
+  Routing through the Worker briefly broke the front page on 2026-07-28 (`/`
+  redirect loop) with the suite green, because the ASSETS mock did not model
+  Cloudflare's `html_handling`. The mock now models it, a test walks every entry
+  point for cycles, and the production workflow smoke-tests the deployed site.
 - [x] SA-11 / M9 / L12 / L13 — client and migration documents have field,
   document, compressed, decompressed, request-stream, and envelope bounds.
 - [x] SA-12 / M6 — saved HTML is reset from dynamic values and carries an
