@@ -46,9 +46,14 @@ committed HTML so a saved file has no runtime dependency.
 
 ```sh
 npm run assemble       # refresh the committed standalone index after source edits
-npm test               # crypto vectors, failure behavior, API auth/CAS/pruning
+npm run assemble:migrate # same for the temporary legacy migration page
+npm test               # runs both checks below, then crypto vectors, failure behavior, API auth/CAS/pruning
+npm run check:assembled # committed public/*.html still matches its template and sources
 npm run check:csp      # exact inline CSP hashes and no external HTML dependencies
 ```
+
+Both assemble scripts rewrite the inline CSP hashes in `public/_headers` for every
+route serving the page, so a style or script edit cannot silently break CSP.
 
 The deployed code is intentionally unminified and has no framework, bundler,
 service worker, or runtime CDN. The preview acceptance checklist also covers
