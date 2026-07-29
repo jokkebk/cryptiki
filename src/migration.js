@@ -2,9 +2,12 @@ const API_BASE = (globalThis.MIGRATION_API || (location.protocol === "file:" ? "
 const DEBUG = new URL(location.href).searchParams.get("debug") === "1";
 const state = { oldPasswordTag: null, entries: null, plaintext: "", format: 0, legacy: null, capsule: null, keys: null, lockTimer: 0 };
 const $ = id => document.getElementById(id);
-const recoveryArgon2 = (password, salt, options) => globalThis.argon2idAsync(password, salt, { ...options, onProgress: value => { $("progress").value = value; } });
+const argon2WithProgress = progressId => (password, salt, options) => globalThis.argon2idAsync(password, salt, { ...options, onProgress: value => { $(progressId).value = value; } });
+const recoveryArgon2 = argon2WithProgress("progress");
+const createArgon2 = argon2WithProgress("create-progress");
 
 function status(message, error = false) { $("status").textContent = message; $("status").className = error ? "error" : "muted"; }
+function createStatus(message, error = false) { $("create-status").textContent = message; $("create-status").className = error ? "error" : "muted"; }
 function debug(message) {
   if (!DEBUG) return;
   const line = `[debug] ${message}`;
@@ -114,12 +117,12 @@ async function recover(event) {
 async function createVault(event) {
   event.preventDefault();
   const name = $("new-name").value.trim(), password = $("new-password").value, confirmation = $("confirm-password").value;
-  if (!state.entries || !name || !password || password !== confirmation) return status("Enter matching new v3 credentials", true);
-  if (!strongCredentials(name, password)) return status(CREDENTIAL_RULE, true);
-  if (state.oldPasswordTag && sameBytes(await passwordTag(password, state.oldPasswordTag.salt), state.oldPasswordTag.digest)) return status("Choose a new master password", true);
-  busy(true); $("progress").hidden = false; $("progress").value = 0; status("Creating and verifying the new v3 vault…");
+  if (!state.entries || !name || !password || password !== confirmation) return createStatus("Enter matching new v3 credentials", true);
+  if (!strongCredentials(name, password)) return createStatus(CREDENTIAL_RULE, true);
+  if (state.oldPasswordTag && sameBytes(await passwordTag(password, state.oldPasswordTag.salt), state.oldPasswordTag.digest)) return createStatus("Choose a new master password", true);
+  busy(true); $("create-progress").hidden = false; $("create-progress").value = 0; createStatus("Creating and verifying the new v3 vault…");
   try {
-    const keys = await deriveV3(name, password, recoveryArgon2); state.keys = keys;
+    const keys = await deriveV3(name, password, createArgon2); state.keys = keys;
     const doc = { format: 1, entries: state.entries.map(value => ({ ...value })) }; const blob = await encryptV3(doc, keys.encKey);
     /* A create can commit and lose its response; only the decrypted read-back tells someone else's
        vault from our own already-committed create. */
@@ -130,19 +133,19 @@ async function createVault(event) {
     if (!read.ok) throw Error(read.status === 404 ? "That new vault already exists; choose another name or password" : "new vault verification failed");
     const saved = await read.json(); const verified = await decryptV3(unb64(saved.blob), keys.encKey);
     if (JSON.stringify(verified) !== JSON.stringify(doc)) throw Error("That new vault already exists; choose another name or password");
-    clearSensitive(); show("recovery-card", false); show("preview-card", false); show("parse-failure-card", false); show("failure-card", false); show("result-card", true); $("cleanup-status").textContent = "Your recovery capsule stays available until the window closes on 2027-01-26, then it is deleted automatically."; $("progress").hidden = true; status("Migration complete"); busy(false);
+    clearSensitive(); show("recovery-card", false); show("preview-card", false); show("parse-failure-card", false); show("failure-card", false); show("result-card", true); $("cleanup-status").textContent = "Your recovery capsule stays available until the window closes on 2027-01-26, then it is deleted automatically."; $("create-progress").hidden = true; createStatus(""); status("Migration complete"); busy(false);
   } catch (error) {
-    $("progress").hidden = true; busy(false);
+    $("create-progress").hidden = true; busy(false);
     if (error?.message?.includes("already exists")) { clearSensitive(); show("preview-card", false); show("failure-card", true); $("failure").textContent = "The new vault could not be created because those credentials already identify a vault. Start again with a different new name or password."; status("Migration failed", true); return; }
     /* Anything else is transient. Recovery cost the user a memory-hard derivation and the window is
        one-shot, so keep the verified entries on screen and let them press Create again; the retry
        resolves a create that committed without returning. */
-    status("Could not create the new vault. Your recovered entries are still here — try again.", true);
+    createStatus("Could not create the new vault. Your recovered entries are still here — try again.", true);
   }
 }
 
 function downloadText(name, content) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([content], { type: "text/plain" })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
-function restart() { clearSensitive(); $("failure").textContent = "Check the page name, password, format, or recovery code and try again. The tool intentionally does not reveal which check failed."; show("result-card", false); show("failure-card", false); show("preview-card", false); show("parse-failure-card", false); show("recovery-card", true); status(""); $("old-name").focus(); }
+function restart() { clearSensitive(); $("failure").textContent = "Check the page name, password, format, or recovery code and try again. The tool intentionally does not reveal which check failed."; show("result-card", false); show("failure-card", false); show("preview-card", false); show("parse-failure-card", false); show("recovery-card", true); $("create-progress").hidden = true; createStatus(""); status(""); $("old-name").focus(); }
 
 window.addEventListener("DOMContentLoaded", () => {
   if (DEBUG) debug("debug mode enabled; lookup IDs are shown only as 12-character prefixes");

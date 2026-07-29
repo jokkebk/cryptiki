@@ -231,6 +231,6 @@ export function strongCredentials(name, password) {
   return typeof name === "string" && typeof password === "string" &&
     name.length >= 4 && password.length >= 12 && name.length + password.length >= 24;
 }
-export const CREDENTIAL_RULE = "Use a vault name of 4+ characters and a master password of 12+ characters";
+export const CREDENTIAL_RULE = "Use a vault name of 4+ characters and a master password of 12+ characters; together they must total at least 24 characters";
 
 export { CAPSULE_AAD, MAX_CONTENT, MAX_ENTRIES, MAX_STRING, V2_ITER, V2_SALT };

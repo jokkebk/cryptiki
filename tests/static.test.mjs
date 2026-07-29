@@ -35,3 +35,12 @@ test("temporary migration page is standalone and text-safe", () => {
   assert.match(migration, /Recovery window closes 2027-01-26/);
   assert.ok(Buffer.byteLength(migration) < 100 * 1024);
 });
+
+test("migration creation controls and feedback precede the recovered entry list", () => {
+  const form = migration.indexOf('id="create-form"');
+  const progress = migration.indexOf('id="create-progress"');
+  const status = migration.indexOf('id="create-status"');
+  const preview = migration.indexOf('id="preview"');
+  assert.ok(form >= 0 && form < progress && progress < status && status < preview);
+  assert.match(migration, /together they must total at least 24 characters/);
+});
