@@ -44,3 +44,13 @@ test("migration creation controls and feedback precede the recovered entry list"
   assert.ok(form >= 0 && form < progress && progress < status && status < preview);
   assert.match(migration, /together they must total at least 24 characters/);
 });
+
+/* The regression this guards: the front page asked for a password twice with no explanation, and
+   readers reasonably read the third box as part of unlocking. */
+test("the unlock screen asks for one password, and Enter unlocks", () => {
+  const screen = html.slice(html.indexOf('id="unlock-screen"'), html.indexOf('id="editor-screen"'));
+  assert.equal((screen.match(/type="password"/g) || []).length, 2, "the unlock screen has more password fields than name + confirm");
+  assert.match(screen, /id="confirm-field" hidden/, "the confirmation must stay hidden until create mode");
+  assert.match(screen, /<button id="unlock" class="primary" type="submit"/, "Enter must submit the unlock form");
+  assert.match(html, /\$\("unlock-form"\)\.addEventListener\("submit"/);
+});

@@ -91,8 +91,15 @@ const CREDENTIAL_RULE = "Use a vault name of 4+ characters and a master password
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*-_";
 const state = { keys: null, doc: null, rev: 0, dirty: false, lockTimer: 0, showAll: false, fresh: new Set(), openNotes: new Set(), rotation: null };
 function status(message, error = false) { $("status").textContent = message; $("status").className = error ? "error" : ""; }
-function busy(value) { document.body.classList.toggle("busy", value); $("unlock").disabled = value; $("create").disabled = value; }
+function busy(value) { document.body.classList.toggle("busy", value); $("unlock").disabled = value; $("mode-toggle").disabled = value; }
 function showEditor(value) { $("unlock-screen").hidden = value; $("editor-screen").hidden = !value; }
+const creating = () => !$("confirm-field").hidden; /* create mode is exactly "the confirmation is showing" */
+function setMode(create) {
+  $("confirm-field").hidden = !create; if (!create) $("create-confirm").value = "";
+  $("unlock-title").textContent = create ? "Create a new vault" : "Unlock your vault";
+  $("unlock").textContent = create ? "Create vault" : "Unlock"; $("mode-toggle").textContent = create ? "I already have a vault" : "Create a new vault instead";
+  $(create && $("master-password").value ? "create-confirm" : "name").focus();
+}
 function touch() { clearTimeout(state.lockTimer); state.lockTimer = setTimeout(lock, 15 * 60 * 1000); }
 function lock() {
   clearTimeout(state.lockTimer);
@@ -103,7 +110,7 @@ function lock() {
   $("retry-old-delete").hidden = true;
   state.showAll = false; state.fresh.clear(); state.openNotes.clear();
   for (const id of ["name", "master-password", "create-confirm", "search"]) $(id).value = "";
-  clearCredentialFields(); $("credential-dialog").close();
+  clearCredentialFields(); $("credential-dialog").close(); setMode(false);
   showEditor(false); renderEntries(); status("Locked"); $("name").focus();
 }
 function markDirty() { state.dirty = true; $("save").textContent = "Save changes"; status("Unsaved changes", false); $("status").className = "warn"; touch(); }
@@ -242,16 +249,20 @@ async function unlock(create) {
   const name = $("name").value.trim(), password = $("master-password").value;
   if (!name || !password) return status("Enter a vault name and master password", true);
   if (create && !strongCredentials(name, password)) return status(CREDENTIAL_RULE, true);
+  /* Checked before the slow derivation, so a typo costs a retype rather than a wait. */
+  if (create && $("create-confirm").value !== password) return status("The two passwords differ — retype the confirmation", true);
   busy(true); status("Deriving key (this takes a moment)…");
   try {
     const keys = await derive(name, password, p => { $("progress").value = p; }); state.keys = keys;
     const response = await api("GET", keys.id);
     if (response.ok) { const data = await response.json(); state.doc = await decrypt(unb64(data.blob), keys.encKey); state.rev = data.rev; }
-    else if (response.status === 404 && create) { if ($("create-confirm").value !== password) throw Error("Enter the same password twice to create a vault"); state.doc = emptyDocument(); const blob = await encrypt(state.doc, keys.encKey); const made = await api("POST", keys.id, { "If-None-Match": "*" }, { blob: b64(blob) }); if (!made.ok) throw Error(made.status === 409 ? "That vault already exists" : "Vault creation failed"); state.rev = 1; }
-    else { state.keys = null; throw Error(response.status === 404 ? "Vault not found or credentials are wrong" : "Unlock failed"); }
+    else if (response.status === 404 && create) { state.doc = emptyDocument(); const blob = await encrypt(state.doc, keys.encKey); const made = await api("POST", keys.id, { "If-None-Match": "*" }, { blob: b64(blob) }); if (!made.ok) throw Error(made.status === 409 ? "That vault already exists" : "Vault creation failed"); state.rev = 1; }
+    else { state.keys = null; throw Error(response.status === 404 ? "No vault matches that name and password — check both, or create a new vault" : "Unlock failed"); }
     showEditor(true); renderEntries(); touch(); status(`Unlocked · revision ${state.rev}`); $("search").focus();
-  } catch (error) { lock(); status(error.message || "Unlock failed", true); }
-  finally { busy(false); $("progress").value = 0; }
+  } catch (error) { /* lock() empties the form — right after a session, but pure friction after a typo. */
+    lock(); $("name").value = name; $("master-password").value = password; if (create) { setMode(true); $("create-confirm").value = password; }
+    status(error.message || "Unlock failed", true); $("master-password").focus(); $("master-password").select();
+  } finally { busy(false); $("progress").value = 0; }
 }
 async function saveVault() {
   if (!state.keys || !state.doc) return;
@@ -347,7 +358,9 @@ async function apiWith(method, id, auth, headers = {}, body) { const h = new Hea
 function saveApp() { download("cryptiki-v3.html", PRISTINE_HTML); }
 function pageHash() { const html = document.documentElement.outerHTML.replace(/(<code id="page-hash">)[^<]*/, "$1"); sha(enc.encode(html)).then(x => $("page-hash").textContent = hex(x)); }
 window.addEventListener("DOMContentLoaded", () => {
-  $("version").textContent = VERSION; $("unlock").onclick = () => unlock(false); $("create").onclick = () => unlock(true); $("lock").onclick = lock; $("new-entry").onclick = newEntry; $("save").onclick = saveVault; $("export").onclick = () => exportVault(); $("import").onclick = importVault; $("change").onclick = changeCredentials; $("save-app").onclick = saveApp; $("delete").onclick = deleteCurrentVault; $("retry-old-delete").onclick = retryOldDeletion; $("cancel-credentials").onclick = () => { clearCredentialFields(); $("credential-dialog").close(); }; $("credential-form").addEventListener("submit", rotateCredentials); $("search").oninput = renderEntries; $("dismiss").onclick = () => $("notice").hidden = true; $("name").focus(); pageHash();
+  $("version").textContent = VERSION; $("lock").onclick = () => lock(); $("mode-toggle").onclick = () => setMode(!creating());
+  /* Enter anywhere in the form runs the button on screen: Unlock, or Create vault in create mode. */
+  $("unlock-form").addEventListener("submit", event => { event.preventDefault(); unlock(creating()); }); $("new-entry").onclick = newEntry; $("save").onclick = saveVault; $("export").onclick = () => exportVault(); $("import").onclick = importVault; $("change").onclick = changeCredentials; $("save-app").onclick = saveApp; $("delete").onclick = deleteCurrentVault; $("retry-old-delete").onclick = retryOldDeletion; $("cancel-credentials").onclick = () => { clearCredentialFields(); $("credential-dialog").close(); }; $("credential-form").addEventListener("submit", rotateCredentials); $("search").oninput = renderEntries; $("dismiss").onclick = () => $("notice").hidden = true; $("name").focus(); pageHash();
   $("toggle-all").onclick = () => { state.showAll = !state.showAll; renderEntries(); };
   $("clear-search").onclick = () => { $("search").value = ""; $("search").focus(); renderEntries(); };
   /* Theme follows the OS until the user overrides it; nothing is persisted. */

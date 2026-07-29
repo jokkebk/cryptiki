@@ -38,7 +38,7 @@ input,textarea,button{font:inherit}
 .grid{display:grid;gap:.7rem}
 @media(min-width:640px){.grid.two{grid-template-columns:1fr 1fr}}
 .row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
-.muted{color:var(--ink-3);font-size:.78rem}
+.muted{color:var(--ink-3);font-size:.78rem}label .muted{text-transform:none;letter-spacing:normal;font-weight:400;margin-top:.1rem}
 progress{width:100%;height:.5rem}
 
 button{font-size:.76rem;line-height:1.1;color:var(--ink-2);background:var(--field);border:1px solid var(--line);
@@ -141,7 +141,8 @@ footer{text-align:center;color:var(--ink-3);font-size:.7rem;padding:1rem;word-br
 
 <section id="notice" class="notice"><button class="icon" id="dismiss" aria-label="Dismiss notice"><svg><use href="#i-close"/></svg></button><strong>Cryptiki v1 &amp; v2 retirement notice</strong><p>Previous versions are retired due to separate security issues in both and replaced with hopefully much hardened v3. You can read more and recover / migrate previous version data in the migration tool below.</p><a href="/legacy-migration">Open the migration tool</a></section>
 
-<section id="unlock-screen" class="card"><h2>Unlock or create a vault</h2><div class="grid"><label>Vault name — a second secret<input id="name" autocomplete="off"></label><label>Master password<input id="master-password" type="password" autocomplete="off"></label><label>Confirm password for a new vault<input id="create-confirm" type="password" autocomplete="off"><span class="muted">Only used when creating a vault; a weak name/password pair can be guessed online.</span></label><progress id="progress" max="1" value="0" aria-label="Unlock progress"></progress><div class="row"><button id="unlock" class="primary">Unlock</button><button id="create">Create new vault</button></div><p class="muted">Nothing is remembered in browser storage. Name, password, plaintext, and keys stay in memory.</p></div></section>
+<!-- One password field, and Enter unlocks. The confirmation appears only in create mode, where typing the password twice is the point rather than an unexplained third box. -->
+<section id="unlock-screen" class="card"><h2 id="unlock-title">Unlock your vault</h2><form id="unlock-form" class="grid"><label>Vault name — a second secret<input id="name" autocomplete="off"></label><label>Master password<input id="master-password" type="password" autocomplete="off"></label><label id="confirm-field" hidden>Confirm master password<input id="create-confirm" type="password" autocomplete="off"><span class="muted">Typed twice so a new vault is never created under a mistyped password. Use a name of 4+ characters and a password of 12+, at least 24 together — a weak pair can be guessed offline.</span></label><progress id="progress" max="1" value="0" aria-label="Unlock progress"></progress><div class="row"><button id="unlock" class="primary" type="submit">Unlock</button><button id="mode-toggle" type="button">Create a new vault instead</button></div></form><p class="muted">Nothing is remembered in browser storage. Name, password, plaintext, and keys stay in memory.</p></section>
 
 <section id="editor-screen" hidden>
   <div class="finder">
