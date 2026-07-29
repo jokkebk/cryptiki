@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-sZVM0W5DSDsDVbYnNj5OHqvFDQ3QeKEU1P9590ByY8c='; style-src 'sha256-0Y1BJ+3aTlUHLz75ee35QnWNGKvcHgWh02/ZzHxH0gk='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6CPDZ1QPTxfsYu5p3t61YPYj53NlZK13DEpXGne0cdk='; style-src 'sha256-0Y1BJ+3aTlUHLz75ee35QnWNGKvcHgWh02/ZzHxH0gk='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
 <style>
 /* Light palette: warm paper. Dark palette below. Theme follows the OS; the header
    toggle overrides it for this session only — nothing is written to browser storage. */
@@ -1613,6 +1613,10 @@ function emptyDocument() { return { format: 1, entries: [] }; }
 function strongCredentials(name, password) { return name.length >= 4 && password.length >= 12 && name.length + password.length >= 24; }
 const CREDENTIAL_RULE = "Use a vault name of 4+ characters and a master password of 12+ characters";
 
+/* Auto-lock windows. Nothing is persisted, so closing or reloading the tab already locks the vault;
+   these cover an unattended open tab, where the OS screen lock is the other line of defence. Both
+   were short enough that ordinary use — a glance at another tab, a phone call — meant re-unlocking. */
+const IDLE_LOCK_MS = 60 * 60 * 1000, HIDDEN_LOCK_MS = 15 * 60 * 1000;
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*-_";
 const state = { keys: null, doc: null, rev: 0, dirty: false, lockTimer: 0, showAll: false, fresh: new Set(), openNotes: new Set(), rotation: null };
 function status(message, error = false) { $("status").textContent = message; $("status").className = error ? "error" : ""; }
@@ -1625,8 +1629,8 @@ function setMode(create) {
   $("unlock").textContent = create ? "Create vault" : "Unlock"; $("mode-toggle").textContent = create ? "I already have a vault" : "Create a new vault instead";
   $(create && $("master-password").value ? "create-confirm" : "name").focus();
 }
-function touch() { clearTimeout(state.lockTimer); state.lockTimer = setTimeout(lock, 15 * 60 * 1000); }
-function lock() {
+function touch() { clearTimeout(state.lockTimer); state.lockTimer = setTimeout(() => lock("Locked after an hour without activity"), IDLE_LOCK_MS); }
+function lock(reason = "Locked") {
   clearTimeout(state.lockTimer);
   for (const key of ["root", "encKey", "auth", "nameSalt"]) state.keys?.[key]?.fill?.(0);
   if (state.keys) { state.keys.password = ""; state.keys.name = ""; }
@@ -1636,7 +1640,7 @@ function lock() {
   state.showAll = false; state.fresh.clear(); state.openNotes.clear();
   for (const id of ["name", "master-password", "create-confirm", "search"]) $(id).value = "";
   clearCredentialFields(); $("credential-dialog").close(); setMode(false);
-  showEditor(false); renderEntries(); status("Locked"); $("name").focus();
+  showEditor(false); renderEntries(); status(reason); $("name").focus();
 }
 function markDirty() { state.dirty = true; $("save").textContent = "Save changes"; status("Unsaved changes", false); $("status").className = "warn"; touch(); }
 function toast(message) { const t = $("toast"); t.textContent = message; t.classList.add("up"); clearTimeout(t.timer); t.timer = setTimeout(() => t.classList.remove("up"), 1500); }
@@ -1893,7 +1897,7 @@ window.addEventListener("DOMContentLoaded", () => {
   applyTheme(dark.matches ? "dark" : "light");
   dark.addEventListener("change", event => { if (!chosen) applyTheme(event.matches ? "dark" : "light"); });
   $("theme").onclick = () => { chosen = true; applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"); };
-  document.addEventListener("keydown", touch);
+  for (const event of ["keydown", "pointerdown"]) document.addEventListener(event, touch); /* keydown alone locked mouse-only sessions mid-use */
   document.addEventListener("keydown", event => {
     const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
     if (event.key === "/" && !typing && !$("editor-screen").hidden) { event.preventDefault(); $("search").focus(); $("search").select(); }
@@ -1901,8 +1905,8 @@ window.addEventListener("DOMContentLoaded", () => {
     if (event.key === "Escape" && $("search").value) { $("search").value = ""; renderEntries(); }
     if (event.key === "Enter") { const top = visibleEntries()[0]; if (top) copySecret(top.password, null, `Password for ${top.service}`); }
   });
-  /* A hidden tab locks on its own after a minute rather than waiting for the user to come back. */
-  document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(state.lockTimer); state.lockTimer = setTimeout(lock, 60_000); } else touch(); });
+  /* A hidden tab locks sooner than an active one, but not so soon that a glance elsewhere costs an unlock. */
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(state.lockTimer); state.lockTimer = setTimeout(() => lock("Locked while the tab was in the background"), HIDDEN_LOCK_MS); } else touch(); });
   window.addEventListener("beforeunload", e => { if (state.dirty) { e.preventDefault(); e.returnValue = ""; } });
 });
 </script>

@@ -13,7 +13,12 @@ The server never receives the vault name, master password, plaintext,
 encryption key, or a plaintext hash. No password, root, key, token, or
 decrypted document is written to localStorage, sessionStorage, or IndexedDB.
 Authentication is bearer authorization derived from the credentials and is
-required for every read, write, and delete. Creation is insert-only; writes use
+required for every read, write, and delete. Because nothing is persisted,
+closing or reloading the tab locks the vault; an open tab also auto-locks after
+an hour without keyboard or pointer activity, or after fifteen minutes hidden in
+the background. Those windows are usability trades — the earlier one-minute
+background lock made ordinary use a string of re-unlocks — and the OS screen
+lock remains the control for an unattended machine. Creation is insert-only; writes use
 revision compare-and-swap and retain ten old ciphertext revisions.
 
 This does not protect against a host that serves malicious JavaScript: it can

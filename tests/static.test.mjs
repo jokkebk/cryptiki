@@ -53,4 +53,6 @@ test("the unlock screen asks for one password, and Enter unlocks", () => {
   assert.match(screen, /id="confirm-field" hidden/, "the confirmation must stay hidden until create mode");
   assert.match(screen, /<button id="unlock" class="primary" type="submit"/, "Enter must submit the unlock form");
   assert.match(html, /\$\("unlock-form"\)\.addEventListener\("submit"/);
+  /* Auto-lock windows long enough that ordinary use is not a string of re-unlocks. */
+  assert.match(html, /const IDLE_LOCK_MS = 60 \* 60 \* 1000, HIDDEN_LOCK_MS = 15 \* 60 \* 1000;/);
 });
