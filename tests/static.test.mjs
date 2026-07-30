@@ -12,11 +12,10 @@ test("standalone deployed code stays local and within the budget", () => {
   assert.doesNotMatch(html, /<(?:script|link)[^>]+(?:src|href)=["']https?:/i);
   assert.doesNotMatch(html, /\b(?:localStorage|sessionStorage|indexedDB)\s*\./);
   assert.doesNotMatch(html, /innerHTML/);
-  /* The budget keeps the deployed code small enough to read end to end. Raised from 2100 on
-     2026-07-28 for the audit fixes: bounded decoding, resumable rotation, the per-vault limiter,
-     fail-closed edge identity, and the pristine-snapshot offline copy. Trim before raising again. */
-  assert.ok(html.split("\n").length + worker.split("\n").length < 2150);
-  assert.ok(Buffer.byteLength(html) + Buffer.byteLength(worker) < 112 * 1024);
+  /* The assembler keeps readable upstream sources but omits BLAKE2s and SHA-2, which Argon2id
+     cannot reach. This is lower than the original 2,000-line / 100-KiB budget. */
+  assert.ok(html.split("\n").length + worker.split("\n").length < 1900);
+  assert.ok(Buffer.byteLength(html) + Buffer.byteLength(worker) < 100 * 1024);
 });
 
 test("Worker SQL is prepared-only and uses no legacy schema", () => {

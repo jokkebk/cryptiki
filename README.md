@@ -64,8 +64,9 @@ upstream package tarball SHA-256 is
 `e8a765d92c04faaccba8776411c5038cb195f812ee629fce07e1d2e6aec80ea0`; the
 upstream `esm/argon2.js` SHA-256 is
 `f4ef7a7d34afbdc12cb154a67e6379b4bf3c4c51c82d6599eed4d55be4d480e5`.
-The fenced source is kept readable under `src/vendor/` and is inlined into the
-committed HTML so a saved file has no runtime dependency.
+The fenced source is kept readable under `src/vendor/`; the assembler inlines
+Argon2id's dependency closure (BLAKE2b, not unrelated BLAKE2s/SHA-2 code) into
+the committed HTML so a saved file has no runtime dependency.
 
 ## Development and verification
 

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { argon2id, argon2idAsync } from "../src/vendor/argon2.js";
+import { argon2Bundle } from "../tools/build.mjs";
 
 const enc = new TextEncoder();
 const cat = (...xs) => { const out = new Uint8Array(xs.reduce((n, x) => n + x.length, 0)); let i = 0; for (const x of xs) { out.set(x, i); i += x.length; } return out; };
@@ -20,6 +21,16 @@ test("Argon2id RFC vector and v3 derivation vector", async () => {
   assert.equal(hex(await hkdf(root, salt, "cryptiki.v3.encryption")), "ed6207470135c2c8b2fa51cd483d04fb7d86cb2ed4af0a045f0bdf1d801e4a7b");
   assert.equal(hex(await hkdf(root, salt, "cryptiki.v3.authorization")), "a4fcb7c2b1097c583de375665e4ec91e396425a8258891ff0291df1472267504");
   assert.equal(hex((await hkdf(root, salt, "cryptiki.v3.identifier")).subarray(0, 16)), "9467a815fb4c6be7a40cab62c936da84");
+});
+
+test("assembled Argon2id omits unrelated hashes and keeps the RFC vector", async () => {
+  const source = argon2Bundle();
+  assert.doesNotMatch(source, /\b(?:BLAKE2s|SHA256_IV|SHA224_IV)\b/);
+  const exposed = `${source}\nexport { argon2idAsync as bundledArgon2id };`;
+  const module = await import(`data:text/javascript;base64,${Buffer.from(exposed).toString("base64")}`);
+  const result = await module.bundledArgon2id("password", "somesalt",
+    { m: 32, t: 3, p: 4, dkLen: 32, maxmem: 1024 * 1024 });
+  assert.equal(hex(result), "bb0cc80a3e671149526915418c6eefe761bb19d5d2d567a017703e0cea6ab05c");
 });
 
 test("AES-GCM envelope authenticates and round-trips", async () => {

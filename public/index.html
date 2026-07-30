@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6CPDZ1QPTxfsYu5p3t61YPYj53NlZK13DEpXGne0cdk='; style-src 'sha256-0Y1BJ+3aTlUHLz75ee35QnWNGKvcHgWh02/ZzHxH0gk='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-tDnlP3z5RGaiY1VHoZI8+qvwTb3a7kd+YEWYzU5iXCo='; style-src 'sha256-inSB00GfzdfQjlIhl9oNVZ7MOeh7SJOLKLdgSAsLIzg='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
 <style>
 /* Light palette: warm paper. Dark palette below. Theme follows the OS; the header
    toggle overrides it for this session only — nothing is written to browser storage. */
@@ -12,7 +12,6 @@ body{margin:0;background-image:var(--glow);-webkit-text-size-adjust:100%}
 main{max-width:900px;margin:auto;padding:0 1rem 3rem}
 svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;display:block}
 [hidden]{display:none!important}
-
 .top{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.1rem 0 .8rem}
 h1{font-size:1.05rem;font-weight:600;margin:0;letter-spacing:.02em;display:flex;align-items:center;gap:.45rem}
 h1::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);flex:none}
@@ -21,10 +20,8 @@ h2{font-size:.95rem;margin:.1rem 0 .7rem;font-weight:600}
 .state{display:flex;align-items:center;gap:.5rem;font-size:.74rem;color:var(--ink-2);text-align:right;min-width:0}
 #status.error{color:var(--bad)}
 #status.warn{color:var(--warn)}
-
 .card{background:var(--field);border:1px solid var(--line);padding:1rem;margin:.8rem 0}
-.notice{background:var(--warn-soft);border:1px solid var(--warn-line);border-left:3px solid var(--warn);
-  color:var(--warn-ink);padding:.7rem 2.2rem .7rem .9rem;margin:.9rem 0;font-size:.82rem;position:relative}
+.notice{background:var(--warn-soft);border:1px solid var(--warn-line);border-left:3px solid var(--warn);color:var(--warn-ink);padding:.7rem 2.2rem .7rem .9rem;margin:.9rem 0;font-size:.82rem;position:relative}
 .notice strong{color:var(--warn)}
 .notice p{margin:.3rem 0 .4rem}
 .notice a{color:var(--warn);font-weight:600}
@@ -40,16 +37,13 @@ input,textarea,button{font:inherit}
 .row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
 .muted{color:var(--ink-3);font-size:.78rem}label .muted{text-transform:none;letter-spacing:normal;font-weight:400;margin-top:.1rem}
 progress{width:100%;height:.5rem}
-
-button{font-size:.76rem;line-height:1.1;color:var(--ink-2);background:var(--field);border:1px solid var(--line);
-  padding:.42rem .65rem;cursor:pointer;letter-spacing:.02em}
+button{font-size:.76rem;line-height:1.1;color:var(--ink-2);background:var(--field);border:1px solid var(--line);padding:.42rem .65rem;cursor:pointer;letter-spacing:.02em}
 button:hover{color:var(--ink);border-color:var(--ink-3)}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
 button.primary:hover{background:var(--accent-hi);border-color:var(--accent-hi);color:var(--on-accent)}
 button.danger{color:var(--bad);border-color:var(--bad)}
-.icon{border:1px solid transparent;background:none;padding:0;width:30px;height:30px;display:grid;place-items:center;
-  color:var(--ink-3);flex:none}
+.icon{border:1px solid transparent;background:none;padding:0;width:30px;height:30px;display:grid;place-items:center;color:var(--ink-3);flex:none}
 .icon:hover{background:var(--hover);color:var(--ink)}
 .icon.on{color:var(--accent)}
 .icon.ok{color:var(--good)}
@@ -57,7 +51,6 @@ button.danger{color:var(--bad);border-color:var(--bad)}
 .icon.kill{opacity:.4}
 .icon.kill:hover{color:var(--bad);opacity:1;background:var(--bad-soft)}
 body.busy button{cursor:wait}
-
 .finder{position:sticky;top:0;z-index:6;background:var(--bg);padding:.6rem 0 .45rem;border-bottom:1px solid var(--line)}
 .searchbox{display:flex;align-items:center;gap:.5rem;background:var(--field);border:1px solid var(--line);padding:.1rem .7rem}
 .searchbox:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
@@ -68,16 +61,13 @@ body.busy button{cursor:wait}
 .finder-foot{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-top:.45rem;font-size:.74rem;color:var(--ink-2)}
 #count b{color:var(--ink);font-weight:700}
 .finder-acts{display:flex;gap:.3rem;flex-wrap:wrap}
-
 /* Every value in a row is a live field — there is no edit mode. */
 #entries{border-bottom:1px solid var(--line)}
-.entry{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr) auto auto auto;gap:.1rem .3rem;
-  align-items:center;border-bottom:1px solid var(--line-2);padding:.18rem .3rem}
+.entry{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr) auto auto auto;gap:.1rem .3rem;align-items:center;border-bottom:1px solid var(--line-2);padding:.18rem .3rem}
 .entry:focus-within{background:var(--field);box-shadow:inset 2px 0 0 var(--accent)}
 .entry.fresh{background:var(--fresh)}
 .cell{display:flex;align-items:center;gap:.05rem;min-width:0}
-.f{border:1px solid transparent;background:none;padding:.28rem .35rem;width:100%;min-width:0;color:var(--ink);
-  font:400 .84rem/1.35 var(--mono);text-overflow:ellipsis}
+.f{border:1px solid transparent;background:none;padding:.28rem .35rem;width:100%;min-width:0;color:var(--ink);font:400 .84rem/1.35 var(--mono);text-overflow:ellipsis}
 .f:hover{border-color:var(--line);background:var(--field)}
 .f:focus{outline:0;border-color:var(--accent);background:var(--field);box-shadow:0 0 0 3px var(--ring)}
 .f::placeholder{color:var(--ink-3);font-style:italic}
@@ -86,18 +76,15 @@ body.busy button{cursor:wait}
 .f.pw{font-size:.8rem;letter-spacing:.02em;width:13ch;flex:none;text-overflow:clip}
 .f.pw[type=text]{color:var(--accent);width:auto;min-width:13ch;flex:1}
 .note-wrap{grid-column:1/-1;padding:.15rem 0 .5rem}
-.note-wrap textarea{width:100%;font:400 .82rem/1.45 var(--mono);color:var(--warn-ink);background:var(--warn-soft);
-  border:1px solid var(--warn-line);border-left:2px solid var(--warn);padding:.5rem .6rem;min-height:3.4rem;resize:vertical}
+.note-wrap textarea{width:100%;font:400 .82rem/1.45 var(--mono);color:var(--warn-ink);background:var(--warn-soft);border:1px solid var(--warn-line);border-left:2px solid var(--warn);padding:.5rem .6rem;min-height:3.4rem;resize:vertical}
 .note-wrap textarea:focus{outline:0;border-color:var(--warn);box-shadow:0 0 0 3px var(--warn-ring)}
 .note-wrap textarea::placeholder{color:var(--warn-dim);font-style:italic}
-
 .empty{text-align:center;padding:2.2rem 1rem;color:var(--ink-3);font-size:.8rem}
 .empty .big{color:var(--ink-2);font-size:.95rem;margin-bottom:.35rem}
 kbd{font:600 .72rem var(--mono);background:var(--field);border:1px solid var(--line);padding:.05rem .3rem;color:var(--accent)}
 .tools{display:flex;flex-wrap:wrap;gap:.3rem;padding:1rem 0;border-top:1px solid var(--line);margin-top:1rem}
 footer{text-align:center;color:var(--ink-3);font-size:.7rem;padding:1rem;word-break:break-all}
-.toast{position:fixed;left:50%;bottom:1.1rem;transform:translate(-50%,180%);background:var(--accent);color:var(--on-accent);
-  font-size:.76rem;font-weight:600;padding:.5rem .9rem;z-index:40;transition:transform .2s cubic-bezier(.2,.9,.3,1)}
+.toast{position:fixed;left:50%;bottom:1.1rem;transform:translate(-50%,180%);background:var(--accent);color:var(--on-accent);font-size:.76rem;font-weight:600;padding:.5rem .9rem;z-index:40;transition:transform .2s cubic-bezier(.2,.9,.3,1)}
 .toast.up{transform:translate(-50%,0)}
 
 /* Two lines per row on a phone. Masked dots say nothing at this width, so the
@@ -484,178 +471,6 @@ const BSIGMA = /* @__PURE__ */ Uint8Array.from([
     9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13,
     2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9,
 ]);
-// Mixing function G splitted in two halfs
-function G1s(a, b, c, d, x) {
-    a = (a + b + x) | 0;
-    d = rotr(d ^ a, 16);
-    c = (c + d) | 0;
-    b = rotr(b ^ c, 12);
-    return { a, b, c, d };
-}
-function G2s(a, b, c, d, x) {
-    a = (a + b + x) | 0;
-    d = rotr(d ^ a, 8);
-    c = (c + d) | 0;
-    b = rotr(b ^ c, 7);
-    return { a, b, c, d };
-}
-//# sourceMappingURL=_blake.js.map
-
-/**
- * Internal Merkle-Damgard hash utils.
- * @module
- */
-/** Polyfill for Safari 14. https://caniuse.com/mdn-javascript_builtins_dataview_setbiguint64 */
-function setBigUint64(view, byteOffset, value, isLE) {
-    if (typeof view.setBigUint64 === 'function')
-        return view.setBigUint64(byteOffset, value, isLE);
-    const _32n = BigInt(32);
-    const _u32_max = BigInt(0xffffffff);
-    const wh = Number((value >> _32n) & _u32_max);
-    const wl = Number(value & _u32_max);
-    const h = isLE ? 4 : 0;
-    const l = isLE ? 0 : 4;
-    view.setUint32(byteOffset + h, wh, isLE);
-    view.setUint32(byteOffset + l, wl, isLE);
-}
-/** Choice: a ? b : c */
-function Chi(a, b, c) {
-    return (a & b) ^ (~a & c);
-}
-/** Majority function, true if any two inputs is true. */
-function Maj(a, b, c) {
-    return (a & b) ^ (a & c) ^ (b & c);
-}
-/**
- * Merkle-Damgard hash construction base class.
- * Could be used to create MD5, RIPEMD, SHA1, SHA2.
- */
-class HashMD extends Hash {
-    constructor(blockLen, outputLen, padOffset, isLE) {
-        super();
-        this.finished = false;
-        this.length = 0;
-        this.pos = 0;
-        this.destroyed = false;
-        this.blockLen = blockLen;
-        this.outputLen = outputLen;
-        this.padOffset = padOffset;
-        this.isLE = isLE;
-        this.buffer = new Uint8Array(blockLen);
-        this.view = createView(this.buffer);
-    }
-    update(data) {
-        aexists(this);
-        data = toBytes(data);
-        abytes(data);
-        const { view, buffer, blockLen } = this;
-        const len = data.length;
-        for (let pos = 0; pos < len;) {
-            const take = Math.min(blockLen - this.pos, len - pos);
-            // Fast path: we have at least one block in input, cast it to view and process
-            if (take === blockLen) {
-                const dataView = createView(data);
-                for (; blockLen <= len - pos; pos += blockLen)
-                    this.process(dataView, pos);
-                continue;
-            }
-            buffer.set(data.subarray(pos, pos + take), this.pos);
-            this.pos += take;
-            pos += take;
-            if (this.pos === blockLen) {
-                this.process(view, 0);
-                this.pos = 0;
-            }
-        }
-        this.length += data.length;
-        this.roundClean();
-        return this;
-    }
-    digestInto(out) {
-        aexists(this);
-        aoutput(out, this);
-        this.finished = true;
-        // Padding
-        // We can avoid allocation of buffer for padding completely if it
-        // was previously not allocated here. But it won't change performance.
-        const { buffer, view, blockLen, isLE } = this;
-        let { pos } = this;
-        // append the bit '1' to the message
-        buffer[pos++] = 0b10000000;
-        clean(this.buffer.subarray(pos));
-        // we have less than padOffset left in buffer, so we cannot put length in
-        // current block, need process it and pad again
-        if (this.padOffset > blockLen - pos) {
-            this.process(view, 0);
-            pos = 0;
-        }
-        // Pad until full block byte with zeros
-        for (let i = pos; i < blockLen; i++)
-            buffer[i] = 0;
-        // Note: sha512 requires length to be 128bit integer, but length in JS will overflow before that
-        // You need to write around 2 exabytes (u64_max / 8 / (1024**6)) for this to happen.
-        // So we just write lowest 64 bits of that value.
-        setBigUint64(view, blockLen - 8, BigInt(this.length * 8), isLE);
-        this.process(view, 0);
-        const oview = createView(out);
-        const len = this.outputLen;
-        // NOTE: we do division by 4 later, which should be fused in single op with modulo by JIT
-        if (len % 4)
-            throw new Error('_sha2: outputLen should be aligned to 32bit');
-        const outLen = len / 4;
-        const state = this.get();
-        if (outLen > state.length)
-            throw new Error('_sha2: outputLen bigger than state');
-        for (let i = 0; i < outLen; i++)
-            oview.setUint32(4 * i, state[i], isLE);
-    }
-    digest() {
-        const { buffer, outputLen } = this;
-        this.digestInto(buffer);
-        const res = buffer.slice(0, outputLen);
-        this.destroy();
-        return res;
-    }
-    _cloneInto(to) {
-        to || (to = new this.constructor());
-        to.set(...this.get());
-        const { blockLen, buffer, length, finished, destroyed, pos } = this;
-        to.destroyed = destroyed;
-        to.finished = finished;
-        to.length = length;
-        to.pos = pos;
-        if (length % blockLen)
-            to.buffer.set(buffer);
-        return to;
-    }
-    clone() {
-        return this._cloneInto();
-    }
-}
-/**
- * Initial SHA-2 state: fractional parts of square roots of first 16 primes 2..53.
- * Check out `test/misc/sha2-gen-iv.js` for recomputation guide.
- */
-/** Initial SHA256 state. Bits 0..32 of frac part of sqrt of primes 2..19 */
-const SHA256_IV = /* @__PURE__ */ Uint32Array.from([
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-]);
-/** Initial SHA224 state. Bits 32..64 of frac part of sqrt of primes 23..53 */
-const SHA224_IV = /* @__PURE__ */ Uint32Array.from([
-    0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939, 0xffc00b31, 0x68581511, 0x64f98fa7, 0xbefa4fa4,
-]);
-/** Initial SHA384 state. Bits 0..64 of frac part of sqrt of primes 23..53 */
-const SHA384_IV = /* @__PURE__ */ Uint32Array.from([
-    0xcbbb9d5d, 0xc1059ed8, 0x629a292a, 0x367cd507, 0x9159015a, 0x3070dd17, 0x152fecd8, 0xf70e5939,
-    0x67332667, 0xffc00b31, 0x8eb44a87, 0x68581511, 0xdb0c2e0d, 0x64f98fa7, 0x47b5481d, 0xbefa4fa4,
-]);
-/** Initial SHA512 state. Bits 0..64 of frac part of sqrt of primes 2..19 */
-const SHA512_IV = /* @__PURE__ */ Uint32Array.from([
-    0x6a09e667, 0xf3bcc908, 0xbb67ae85, 0x84caa73b, 0x3c6ef372, 0xfe94f82b, 0xa54ff53a, 0x5f1d36f1,
-    0x510e527f, 0xade682d1, 0x9b05688c, 0x2b3e6c1f, 0x1f83d9ab, 0xfb41bd6b, 0x5be0cd19, 0x137e2179,
-]);
-//# sourceMappingURL=_md.js.map
-
 /**
  * Internal helpers for u64. BigUint64Array is too slow as per 2025, so we implement it using Uint32Array.
  * @todo re-check https://issues.chromium.org/issues/42212588
@@ -1025,113 +840,6 @@ class BLAKE2b extends BLAKE2 {
  * @param opts - dkLen output length, key for MAC mode, salt, personalization
  */
 const blake2b = /* @__PURE__ */ createOptHasher((opts) => new BLAKE2b(opts));
-// prettier-ignore
-function compress(s, offset, msg, rounds, v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15) {
-    let j = 0;
-    for (let i = 0; i < rounds; i++) {
-        ({ a: v0, b: v4, c: v8, d: v12 } = G1s(v0, v4, v8, v12, msg[offset + s[j++]]));
-        ({ a: v0, b: v4, c: v8, d: v12 } = G2s(v0, v4, v8, v12, msg[offset + s[j++]]));
-        ({ a: v1, b: v5, c: v9, d: v13 } = G1s(v1, v5, v9, v13, msg[offset + s[j++]]));
-        ({ a: v1, b: v5, c: v9, d: v13 } = G2s(v1, v5, v9, v13, msg[offset + s[j++]]));
-        ({ a: v2, b: v6, c: v10, d: v14 } = G1s(v2, v6, v10, v14, msg[offset + s[j++]]));
-        ({ a: v2, b: v6, c: v10, d: v14 } = G2s(v2, v6, v10, v14, msg[offset + s[j++]]));
-        ({ a: v3, b: v7, c: v11, d: v15 } = G1s(v3, v7, v11, v15, msg[offset + s[j++]]));
-        ({ a: v3, b: v7, c: v11, d: v15 } = G2s(v3, v7, v11, v15, msg[offset + s[j++]]));
-        ({ a: v0, b: v5, c: v10, d: v15 } = G1s(v0, v5, v10, v15, msg[offset + s[j++]]));
-        ({ a: v0, b: v5, c: v10, d: v15 } = G2s(v0, v5, v10, v15, msg[offset + s[j++]]));
-        ({ a: v1, b: v6, c: v11, d: v12 } = G1s(v1, v6, v11, v12, msg[offset + s[j++]]));
-        ({ a: v1, b: v6, c: v11, d: v12 } = G2s(v1, v6, v11, v12, msg[offset + s[j++]]));
-        ({ a: v2, b: v7, c: v8, d: v13 } = G1s(v2, v7, v8, v13, msg[offset + s[j++]]));
-        ({ a: v2, b: v7, c: v8, d: v13 } = G2s(v2, v7, v8, v13, msg[offset + s[j++]]));
-        ({ a: v3, b: v4, c: v9, d: v14 } = G1s(v3, v4, v9, v14, msg[offset + s[j++]]));
-        ({ a: v3, b: v4, c: v9, d: v14 } = G2s(v3, v4, v9, v14, msg[offset + s[j++]]));
-    }
-    return { v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15 };
-}
-const B2S_IV = SHA256_IV;
-class BLAKE2s extends BLAKE2 {
-    constructor(opts = {}) {
-        const olen = opts.dkLen === undefined ? 32 : opts.dkLen;
-        super(64, olen);
-        // Internal state, same as SHA-256
-        this.v0 = B2S_IV[0] | 0;
-        this.v1 = B2S_IV[1] | 0;
-        this.v2 = B2S_IV[2] | 0;
-        this.v3 = B2S_IV[3] | 0;
-        this.v4 = B2S_IV[4] | 0;
-        this.v5 = B2S_IV[5] | 0;
-        this.v6 = B2S_IV[6] | 0;
-        this.v7 = B2S_IV[7] | 0;
-        checkBlake2Opts(olen, opts, 32, 8, 8);
-        let { key, personalization, salt } = opts;
-        let keyLength = 0;
-        if (key !== undefined) {
-            key = toBytes(key);
-            keyLength = key.length;
-        }
-        this.v0 ^= this.outputLen | (keyLength << 8) | (0x01 << 16) | (0x01 << 24);
-        if (salt !== undefined) {
-            salt = toBytes(salt);
-            const slt = u32(salt);
-            this.v4 ^= swap8IfBE(slt[0]);
-            this.v5 ^= swap8IfBE(slt[1]);
-        }
-        if (personalization !== undefined) {
-            personalization = toBytes(personalization);
-            const pers = u32(personalization);
-            this.v6 ^= swap8IfBE(pers[0]);
-            this.v7 ^= swap8IfBE(pers[1]);
-        }
-        if (key !== undefined) {
-            // Pad to blockLen and update
-            abytes(key);
-            const tmp = new Uint8Array(this.blockLen);
-            tmp.set(key);
-            this.update(tmp);
-        }
-    }
-    get() {
-        const { v0, v1, v2, v3, v4, v5, v6, v7 } = this;
-        return [v0, v1, v2, v3, v4, v5, v6, v7];
-    }
-    // prettier-ignore
-    set(v0, v1, v2, v3, v4, v5, v6, v7) {
-        this.v0 = v0 | 0;
-        this.v1 = v1 | 0;
-        this.v2 = v2 | 0;
-        this.v3 = v3 | 0;
-        this.v4 = v4 | 0;
-        this.v5 = v5 | 0;
-        this.v6 = v6 | 0;
-        this.v7 = v7 | 0;
-    }
-    compress(msg, offset, isLast) {
-        const { h, l } = u64.fromBig(BigInt(this.length));
-        // prettier-ignore
-        const { v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15 } = compress(BSIGMA, offset, msg, 10, this.v0, this.v1, this.v2, this.v3, this.v4, this.v5, this.v6, this.v7, B2S_IV[0], B2S_IV[1], B2S_IV[2], B2S_IV[3], l ^ B2S_IV[4], h ^ B2S_IV[5], isLast ? ~B2S_IV[6] : B2S_IV[6], B2S_IV[7]);
-        this.v0 ^= v0 ^ v8;
-        this.v1 ^= v1 ^ v9;
-        this.v2 ^= v2 ^ v10;
-        this.v3 ^= v3 ^ v11;
-        this.v4 ^= v4 ^ v12;
-        this.v5 ^= v5 ^ v13;
-        this.v6 ^= v6 ^ v14;
-        this.v7 ^= v7 ^ v15;
-    }
-    destroy() {
-        this.destroyed = true;
-        clean(this.buffer32);
-        this.set(0, 0, 0, 0, 0, 0, 0, 0);
-    }
-}
-/**
- * Blake2s hash function. Focuses on 8-bit to 32-bit platforms. 1.5x faster than blake2b in JS.
- * @param msg - message that would be hashed
- * @param opts - dkLen output length, key for MAC mode, salt, personalization
- */
-const blake2s = /* @__PURE__ */ createOptHasher((opts) => new BLAKE2s(opts));
-//# sourceMappingURL=blake2.js.map
-
 /**
  * Argon2 KDF from RFC 9106. Can be used to create a key from password and salt.
  * We suggest to use Scrypt. JS Argon is 2-10x slower than native code because of 64-bitness:

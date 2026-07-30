@@ -8,19 +8,19 @@
   Cache-Control: no-store
 
 /
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-6CPDZ1QPTxfsYu5p3t61YPYj53NlZK13DEpXGne0cdk='; style-src 'sha256-0Y1BJ+3aTlUHLz75ee35QnWNGKvcHgWh02/ZzHxH0gk='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-tDnlP3z5RGaiY1VHoZI8+qvwTb3a7kd+YEWYzU5iXCo='; style-src 'sha256-inSB00GfzdfQjlIhl9oNVZ7MOeh7SJOLKLdgSAsLIzg='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'
 
 /index.html
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-6CPDZ1QPTxfsYu5p3t61YPYj53NlZK13DEpXGne0cdk='; style-src 'sha256-0Y1BJ+3aTlUHLz75ee35QnWNGKvcHgWh02/ZzHxH0gk='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-tDnlP3z5RGaiY1VHoZI8+qvwTb3a7kd+YEWYzU5iXCo='; style-src 'sha256-inSB00GfzdfQjlIhl9oNVZ7MOeh7SJOLKLdgSAsLIzg='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'
 
 /api/*
   Cache-Control: no-store
 
 /legacy-migration
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-CAuggRVLVPm4w+omOpIRmflHW4ZULC4m8eHQoYNZPiU='; style-src 'sha256-9eKSNJz0w/o9VM5V1ITHfze7Yps1wZlWevbeyU4dAPQ='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-TaPEa8pb5wBABKLpsiG9yfjsb8UOmYBTs2lVXpu06vQ='; style-src 'sha256-9eKSNJz0w/o9VM5V1ITHfze7Yps1wZlWevbeyU4dAPQ='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'
 
 /legacy-migration/
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-CAuggRVLVPm4w+omOpIRmflHW4ZULC4m8eHQoYNZPiU='; style-src 'sha256-9eKSNJz0w/o9VM5V1ITHfze7Yps1wZlWevbeyU4dAPQ='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-TaPEa8pb5wBABKLpsiG9yfjsb8UOmYBTs2lVXpu06vQ='; style-src 'sha256-9eKSNJz0w/o9VM5V1ITHfze7Yps1wZlWevbeyU4dAPQ='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'
 
 /migrate
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-CAuggRVLVPm4w+omOpIRmflHW4ZULC4m8eHQoYNZPiU='; style-src 'sha256-9eKSNJz0w/o9VM5V1ITHfze7Yps1wZlWevbeyU4dAPQ='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-TaPEa8pb5wBABKLpsiG9yfjsb8UOmYBTs2lVXpu06vQ='; style-src 'sha256-9eKSNJz0w/o9VM5V1ITHfze7Yps1wZlWevbeyU4dAPQ='; connect-src 'self' https://cryptiki.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'
