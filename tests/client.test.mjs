@@ -47,7 +47,7 @@ async function loadClient() {
   globalThis.URL.createObjectURL = blob => { const key = `blob:${objectUrls.size}`; objectUrls.set(key, blob); return key; };
   globalThis.URL.revokeObjectURL = () => {};
   const source = readFileSync(new URL("../src/client.js", import.meta.url), "utf8");
-  const exposed = "\nexport { exportVault, importVault, saveApp, encrypt, decrypt, validDocument, unb64, b64, strongCredentials, state, hkdf, derive, PRISTINE_HTML, download };\n";
+  const exposed = "\nexport { exportVault, importVault, saveApp, encrypt, decrypt, validDocument, unb64, b64, strongCredentials, state, hkdf, derive, PRISTINE_HTML, download, wrapQuickKeys, unwrapQuickRecord, keySet };\n";
   const module = await import(`data:text/javascript;base64,${Buffer.from(source + exposed).toString("base64")}`);
   /* download() routes its bytes through URL.createObjectURL, so objectUrls holds every saved file. */
   return { module, objectUrls, elements };
@@ -91,6 +91,22 @@ test("the encrypted export round trips through the import path", async () => {
   assert.equal(salt.length, 16);
   const exportKey = await module.hkdf(module.state.keys.root, salt, new TextEncoder().encode("cryptiki.v3.export"));
   assert.deepEqual(await module.decrypt(module.unb64(envelope.blob), exportKey), module.state.doc);
+});
+
+test("quick unlock wraps the vault name and root key with PRF-derived encryption", async () => {
+  const { module } = await loadClient();
+  const root = crypto.getRandomValues(new Uint8Array(32));
+  const credentialId = crypto.getRandomValues(new Uint8Array(64));
+  const prfInput = crypto.getRandomValues(new Uint8Array(32));
+  const prf = crypto.getRandomValues(new Uint8Array(32));
+  const record = await module.wrapQuickKeys({ name: "secret-vault-name", root }, credentialId, prfInput, prf);
+  assert.equal(record.format, 1);
+  assert.equal(JSON.stringify(record).includes("secret-vault-name"), false, "the vault name leaked outside the wrapper");
+  const saved = await module.unwrapQuickRecord(record, prf);
+  assert.equal(saved.name, "secret-vault-name");
+  assert.deepEqual(saved.root, root);
+  const tampered = { ...record, wrapped: (record.wrapped.startsWith("A") ? "B" : "A") + record.wrapped.slice(1) };
+  await assert.rejects(module.unwrapQuickRecord(tampered, prf));
 });
 
 test("a click Event or ciphertext is never accepted as the exported document", async () => {

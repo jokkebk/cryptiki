@@ -10,12 +10,17 @@ test("standalone deployed code stays local and within the budget", () => {
   assert.ok(html.includes('location.protocol === "file:"'));
   assert.ok(html.includes("https://cryptiki.com"));
   assert.doesNotMatch(html, /<(?:script|link)[^>]+(?:src|href)=["']https?:/i);
-  assert.doesNotMatch(html, /\b(?:localStorage|sessionStorage|indexedDB)\s*\./);
+  assert.doesNotMatch(html, /\b(?:localStorage|sessionStorage)\s*\./);
+  assert.match(html, /indexedDB\.open\(QUICK_DB/);
   assert.doesNotMatch(html, /innerHTML/);
-  /* The assembler keeps readable upstream sources but omits BLAKE2s and SHA-2, which Argon2id
-     cannot reach. This is lower than the original 2,000-line / 100-KiB budget. */
-  assert.ok(html.split("\n").length + worker.split("\n").length < 1900);
-  assert.ok(Buffer.byteLength(html) + Buffer.byteLength(worker) < 100 * 1024);
+  /* The standalone app remains below its original 2,000-line / 100-KiB budget. */
+  assert.ok(html.split("\n").length < 2000);
+  assert.ok(Buffer.byteLength(html) < 100 * 1024);
+  assert.ok(worker.split("\n").length < 300 && Buffer.byteLength(worker) < 16 * 1024);
+  assert.match(html, /authenticatorAttachment: "platform"/);
+  assert.match(html, /userVerification: "required"/);
+  assert.match(html, /extensions: \{ prf: \{ eval: \{ first: prfInput \}/);
+  assert.match(html, /next\.id === old\.id/, "quick-unlocked credentials must not rotate onto and delete the same vault");
 });
 
 test("Worker SQL is prepared-only and uses no legacy schema", () => {

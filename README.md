@@ -10,16 +10,28 @@ is also the offline app downloaded by “Save this app”.
 ## Security boundary and limits
 
 The server never receives the vault name, master password, plaintext,
-encryption key, or a plaintext hash. No password, root, key, token, or
-decrypted document is written to localStorage, sessionStorage, or IndexedDB.
-Authentication is bearer authorization derived from the credentials and is
-required for every read, write, and delete. Because nothing is persisted,
-closing or reloading the tab locks the vault; an open tab also auto-locks after
-an hour without keyboard or pointer activity, or after fifteen minutes hidden in
-the background. Those windows are usability trades — the earlier one-minute
-background lock made ordinary use a string of re-unlocks — and the OS screen
-lock remains the control for an unattended machine. Creation is insert-only; writes use
-revision compare-and-swap and retain ten old ciphertext revisions.
+encryption key, or a plaintext hash. Authentication is bearer authorization
+derived from the credentials and is required for every read, write, and delete.
+By default no password, root, key, token, or decrypted document is written to
+browser storage. Closing or reloading the tab locks the vault; an open tab also
+auto-locks after an hour without keyboard or pointer activity, or after fifteen
+minutes hidden in the background. Those windows are usability trades — the
+earlier one-minute background lock made ordinary use a string of re-unlocks —
+and the OS screen lock remains the control for an unattended machine. Creation
+is insert-only; writes use revision compare-and-swap and retain ten old
+ciphertext revisions.
+
+Quick unlock is the explicit opt-in exception to the storage rule. On the HTTPS
+site, a platform WebAuthn credential with required user verification supplies a
+32-byte PRF result. HKDF turns it into an AES-GCM wrapping key; IndexedDB stores
+only the credential ID, random PRF input, nonce, format version, and ciphertext.
+The vault name and root key are both inside that authenticated ciphertext, and
+the master password is never stored. The web API requires device verification,
+not biometrics specifically, so the OS may permit its PIN, password, or pattern
+fallback. Clearing site data, removing the authenticator credential, changing
+vault credentials, or deleting the vault removes or invalidates the shortcut;
+the long credentials remain the recovery path. Quick unlock is origin-bound and
+is deliberately unavailable in a saved `file:` copy.
 
 This does not protect against a host that serves malicious JavaScript: it can
 steal a password on a future visit. Save and use a reviewed local copy when

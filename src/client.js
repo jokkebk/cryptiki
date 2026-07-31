@@ -1,6 +1,6 @@
-/* Cryptiki v3 browser client. Secrets live only in this closure and memory. */
+/* Cryptiki v3 browser client. Plaintext secrets live only in this closure and memory. */
 const API = (location.protocol === "file:" ? "https://cryptiki.com" : "").replace(/\/$/, "");
-const VERSION = "3.0.0";
+const VERSION = "3.1.0";
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 const MAX_ENTRIES = 1000;
@@ -30,15 +30,19 @@ async function hkdf(key, salt, info) {
   const imported = await crypto.subtle.importKey("raw", key, "HKDF", false, ["deriveBits"]);
   return bytes(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, imported, 256));
 }
-async function derive(name, password, progress) {
-  const nameSalt = await sha(cat(enc.encode("cryptiki.v3.vault-salt\0"), enc.encode(name)));
-  const root = await window.argon2idAsync(enc.encode(password), nameSalt, { m: 65536, t: 3, p: 1, dkLen: 32, maxmem: 70 * 1024 * 1024, asyncTick: 20, onProgress: progress });
+async function keySet(name, root, password = "", nameSalt) {
+  nameSalt ||= await sha(cat(enc.encode("cryptiki.v3.vault-salt\0"), enc.encode(name)));
   const [encKey, auth, idBytes] = await Promise.all([
     hkdf(root, nameSalt, enc.encode("cryptiki.v3.encryption")),
     hkdf(root, nameSalt, enc.encode("cryptiki.v3.authorization")),
     hkdf(root, nameSalt, enc.encode("cryptiki.v3.identifier")).then(x => x.subarray(0, 16))
   ]);
   return { name, password, nameSalt, root, encKey, auth, id: hex(idBytes) };
+}
+async function derive(name, password, progress) {
+  const nameSalt = await sha(cat(enc.encode("cryptiki.v3.vault-salt\0"), enc.encode(name)));
+  const root = await window.argon2idAsync(enc.encode(password), nameSalt, { m: 65536, t: 3, p: 1, dkLen: 32, maxmem: 70 * 1024 * 1024, asyncTick: 20, onProgress: progress });
+  return keySet(name, root, password, nameSalt);
 }
 async function streamBytes(input, kind, maxBytes = Number.MAX_SAFE_INTEGER) {
   const stream = new Blob([input]).stream().pipeThrough(new kind());
@@ -84,6 +88,64 @@ async function decrypt(blob, key) {
   return validDocument(JSON.parse(dec.decode(await streamBytes(compressed, DecompressionStream.bind(null, "deflate-raw"), MAX_DOCUMENT_BYTES))));
 }
 function emptyDocument() { return { format: 1, entries: [] }; }
+const QUICK_DB = "cryptiki-v3", QUICK_STORE = "quick-unlock", QUICK_SLOT = "device";
+const quickCapable = () => location.origin === "https://cryptiki.com" && !!globalThis.PublicKeyCredential && !!globalThis.indexedDB && !!navigator.credentials;
+const requestResult = request => new Promise((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error || Error("Device storage failed")); });
+async function quickRecord(value) {
+  if (!quickCapable()) return null;
+  const open = indexedDB.open(QUICK_DB, 1);
+  open.onupgradeneeded = () => { if (!open.result.objectStoreNames.contains(QUICK_STORE)) open.result.createObjectStore(QUICK_STORE); };
+  const db = await requestResult(open);
+  try {
+    const tx = db.transaction(QUICK_STORE, value === undefined ? "readonly" : "readwrite");
+    const done = new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error || Error("Device storage failed")); tx.onabort = tx.onerror; });
+    const store = tx.objectStore(QUICK_STORE);
+    const result = await requestResult(value === undefined ? store.get(QUICK_SLOT) : value === null ? store.delete(QUICK_SLOT) : store.put(value, QUICK_SLOT));
+    await done; return result;
+  } finally { db.close(); }
+}
+const quickAad = (credentialId, prfInput) => cat(enc.encode("cryptiki.v3.quick-unlock\0"), Uint8Array.of(1), credentialId, prfInput);
+async function wrapQuickKeys(keys, credentialId, prfInput, prf) {
+  const name = enc.encode(keys.name); if (name.length > 65535 || keys.root.length !== 32) throw Error("Vault credentials cannot be saved");
+  const plain = cat(Uint8Array.of(1, name.length >>> 8, name.length & 255), name, keys.root), nonce = crypto.getRandomValues(new Uint8Array(12)); let wrappingKey;
+  try {
+    wrappingKey = await hkdf(prf, prfInput, enc.encode("cryptiki.v3.quick-unlock.wrap"));
+    const aes = await crypto.subtle.importKey("raw", wrappingKey, "AES-GCM", false, ["encrypt"]);
+    const wrapped = bytes(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: quickAad(credentialId, prfInput), tagLength: 128 }, aes, plain));
+    return { format: 1, credentialId: b64(credentialId), prfInput: b64(prfInput), nonce: b64(nonce), wrapped: b64(wrapped) };
+  } finally { plain.fill(0); wrappingKey?.fill?.(0); }
+}
+async function unwrapQuickRecord(record, prf) {
+  if (!record || record.format !== 1) throw Error("Invalid saved quick unlock");
+  const credentialId = unb64(record.credentialId, 1023), prfInput = unb64(record.prfInput, 32), nonce = unb64(record.nonce, 12), wrapped = unb64(record.wrapped, 64 * 1024);
+  if (prf.length !== 32 || prfInput.length !== 32 || nonce.length !== 12) throw Error("Invalid saved quick unlock");
+  let wrappingKey, plain;
+  try {
+    wrappingKey = await hkdf(prf, prfInput, enc.encode("cryptiki.v3.quick-unlock.wrap"));
+    const aes = await crypto.subtle.importKey("raw", wrappingKey, "AES-GCM", false, ["decrypt"]);
+    plain = bytes(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: quickAad(credentialId, prfInput), tagLength: 128 }, aes, wrapped));
+    const nameLength = plain[1] * 256 + plain[2];
+    if (plain[0] !== 1 || nameLength > MAX_STRING * 3 || plain.length !== 3 + nameLength + 32) throw Error("Invalid saved quick unlock");
+    return { name: dec.decode(plain.subarray(3, 3 + nameLength)), root: plain.slice(-32) };
+  } finally { plain?.fill?.(0); wrappingKey?.fill?.(0); }
+}
+const prfOutput = credential => { const value = credential?.getClientExtensionResults?.().prf?.results?.first; const output = value && bytes(value); return output?.length === 32 ? output : null; };
+async function requestQuickPrf(credentialId, prfInput) {
+  const credential = await navigator.credentials.get({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), allowCredentials: [{ type: "public-key", id: credentialId }], userVerification: "required", timeout: 60000, extensions: { prf: { eval: { first: prfInput } } } } });
+  if (!credential || b64(bytes(credential.rawId)) !== b64(credentialId)) throw Error("Device returned the wrong credential");
+  return prfOutput(credential) || Promise.reject(Error("This browser or authenticator does not support secure quick unlock"));
+}
+async function createQuickCredential(prfInput) {
+  if (typeof PublicKeyCredential.getClientCapabilities === "function") {
+    const capabilities = await PublicKeyCredential.getClientCapabilities();
+    if (capabilities["extension:prf"] === false) throw Error("This browser does not support secure quick unlock");
+  }
+  const userId = crypto.getRandomValues(new Uint8Array(32));
+  const credential = await navigator.credentials.create({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), rp: { name: "Cryptiki" }, user: { id: userId, name: `quick-${b64(userId)}`, displayName: "Cryptiki quick unlock" }, pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }], authenticatorSelection: { authenticatorAttachment: "platform", residentKey: "discouraged", userVerification: "required" }, timeout: 60000, attestation: "none", extensions: { prf: { eval: { first: prfInput } } } } });
+  if (!credential) throw Error("Quick unlock setup was cancelled");
+  const credentialId = bytes(credential.rawId), output = prfOutput(credential) || await requestQuickPrf(credentialId, prfInput);
+  return { credentialId, output };
+}
 /* Kept identical to strongCredentials() in src/migration-core.js; tests assert the two agree. */
 function strongCredentials(name, password) { return name.length >= 4 && password.length >= 12 && name.length + password.length >= 24; }
 const CREDENTIAL_RULE = "Use a vault name of 4+ characters and a master password of 12+ characters";
@@ -94,8 +156,9 @@ const CREDENTIAL_RULE = "Use a vault name of 4+ characters and a master password
 const IDLE_LOCK_MS = 60 * 60 * 1000, HIDDEN_LOCK_MS = 15 * 60 * 1000;
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*-_";
 const state = { keys: null, doc: null, rev: 0, dirty: false, lockTimer: 0, showAll: false, fresh: new Set(), openNotes: new Set(), rotation: null };
+let quickSaved = false;
 function status(message, error = false) { $("status").textContent = message; $("status").className = error ? "error" : ""; }
-function busy(value) { document.body.classList.toggle("busy", value); $("unlock").disabled = value; $("mode-toggle").disabled = value; }
+function busy(value) { document.body.classList.toggle("busy", value); for (const id of ["unlock", "mode-toggle", "quick-unlock", "quick-enable", "quick-forget"]) $(id).disabled = value; }
 function showEditor(value) { $("unlock-screen").hidden = value; $("editor-screen").hidden = !value; }
 const creating = () => !$("confirm-field").hidden; /* create mode is exactly "the confirmation is showing" */
 function setMode(create) {
@@ -249,6 +312,56 @@ async function api(method, path, headers = {}, body) {
   const h = new Headers(headers); if (state.keys) h.set("Authorization", `Bearer ${b64(state.keys.auth)}`); if (body) h.set("Content-Type", "application/json");
   return fetch(`${API}/api/vaults/${path}`, { method, headers: h, body: body && JSON.stringify(body), cache: "no-store" });
 }
+function updateQuickButtons() {
+  const capable = quickCapable();
+  $("quick-unlock").hidden = !capable || !quickSaved; $("quick-forget").hidden = !capable || !quickSaved; $("quick-enable").hidden = !capable;
+  $("quick-enable").textContent = quickSaved ? "Remove quick unlock from this device" : "Enable quick unlock on this device";
+}
+async function refreshQuickUnlock() {
+  if (!quickCapable()) return updateQuickButtons();
+  try { quickSaved = !!await quickRecord(); } catch { quickSaved = false; }
+  updateQuickButtons();
+}
+async function clearQuickUnlock() {
+  if (quickCapable()) await quickRecord(null);
+  quickSaved = false; updateQuickButtons();
+}
+async function forgetQuickUnlock() {
+  try { await clearQuickUnlock(); status("Quick unlock removed from this device"); }
+  catch { status("Could not remove quick unlock from this device", true); }
+}
+async function toggleQuickUnlock() {
+  if (quickSaved) return forgetQuickUnlock();
+  if (!state.keys || !quickCapable()) return status("Quick unlock requires the HTTPS app and an open vault", true);
+  busy(true); status("Verify with this device to enable quick unlock…"); let output;
+  try {
+    const prfInput = crypto.getRandomValues(new Uint8Array(32));
+    const created = await createQuickCredential(prfInput); output = created.output;
+    await quickRecord(await wrapQuickKeys(state.keys, created.credentialId, prfInput, output));
+    quickSaved = true; updateQuickButtons(); status("Quick unlock enabled on this device");
+  } catch (error) { status(error.name === "NotAllowedError" ? "Quick unlock setup cancelled" : error.message || "Quick unlock setup failed", error.name !== "NotAllowedError"); }
+  finally { output?.fill?.(0); busy(false); }
+}
+async function quickUnlock() {
+  busy(true); status("Verify with this device to unlock…"); let prf;
+  try {
+    const record = await quickRecord();
+    if (!record) { quickSaved = false; updateQuickButtons(); throw Error("No quick unlock is saved on this device"); }
+    const credentialId = unb64(record.credentialId, 1023), prfInput = unb64(record.prfInput, 32);
+    prf = await requestQuickPrf(credentialId, prfInput);
+    const saved = await unwrapQuickRecord(record, prf); state.keys = await keySet(saved.name, saved.root);
+    const response = await api("GET", state.keys.id);
+    if (!response.ok) {
+      if (response.status === 404) { await clearQuickUnlock(); throw Error("That saved quick unlock no longer matches a vault — use your vault name and master password"); }
+      throw Error("Quick unlock could not load the vault");
+    }
+    const data = await response.json(); state.doc = await decrypt(unb64(data.blob), state.keys.encKey); state.rev = data.rev;
+    showEditor(true); renderEntries(); touch(); status(`Quick unlocked · revision ${state.rev}`); $("search").focus();
+  } catch (error) {
+    if (state.keys) lock();
+    status(error.name === "NotAllowedError" ? "Quick unlock cancelled" : error.message || "Quick unlock failed", error.name !== "NotAllowedError");
+  } finally { prf?.fill?.(0); busy(false); }
+}
 async function unlock(create) {
   const name = $("name").value.trim(), password = $("master-password").value;
   if (!name || !password) return status("Enter a vault name and master password", true);
@@ -320,8 +433,8 @@ async function rotateCredentials(event) {
   if (!strongCredentials(name, password)) return status(CREDENTIAL_RULE, true);
   busy(true); status("Creating and verifying the new vault…"); const old = state.keys;
   try {
-    if (name === old.name && password === old.password) throw Error("Choose a different credential");
-    const next = await derive(name, password); const blob = await encrypt(state.doc, next.encKey);
+    const next = await derive(name, password); if (next.id === old.id) throw Error("Choose a different credential");
+    const blob = await encrypt(state.doc, next.encKey);
     /* A create can commit and lose its response, so the decrypted read-back, not the POST, decides. */
     let made = null;
     try { made = await apiWith("POST", next.id, next.auth, { "If-None-Match": "*" }, { blob: b64(blob) }); } catch { /* ambiguous; the read below decides */ }
@@ -344,7 +457,9 @@ async function deleteRotationSource() {
   try { removed = await apiWith("DELETE", pending.old.id, pending.old.auth); } catch { return false; }
   if (!removed.ok && removed.status !== 204 && removed.status !== 404) return false;
   state.keys = pending.next; state.rev = pending.rev; state.dirty = false; state.rotation = null;
-  $("name").value = pending.next.name; $("retry-old-delete").hidden = true; return true;
+  $("name").value = pending.next.name; $("retry-old-delete").hidden = true;
+  try { await clearQuickUnlock(); } catch { /* A stale local shortcut must not block a verified rotation. */ }
+  return true;
 }
 async function retryOldDeletion() {
   if (!state.rotation) return;
@@ -355,7 +470,7 @@ async function retryOldDeletion() {
 async function deleteCurrentVault() {
   if (!state.keys || prompt("Type DELETE to permanently remove this vault") !== "DELETE") return;
   busy(true); status("Deleting vault…");
-  try { const response = await api("DELETE", state.keys.id); if (!response.ok && response.status !== 204) throw Error("Vault deletion failed"); lock(); status("Vault deleted"); }
+  try { const response = await api("DELETE", state.keys.id); if (!response.ok && response.status !== 204) throw Error("Vault deletion failed"); try { await clearQuickUnlock(); } catch { /* The server deletion already committed. */ } lock(); status("Vault deleted"); }
   catch (error) { status(error.message, true); } finally { busy(false); }
 }
 async function apiWith(method, id, auth, headers = {}, body) { const h = new Headers(headers); h.set("Authorization", `Bearer ${b64(auth)}`); if (body) h.set("Content-Type", "application/json"); return fetch(`${API}/api/vaults/${id}`, { method, headers: h, body: body && JSON.stringify(body), cache: "no-store" }); }
@@ -364,7 +479,7 @@ function pageHash() { const html = document.documentElement.outerHTML.replace(/(
 window.addEventListener("DOMContentLoaded", () => {
   $("version").textContent = VERSION; $("lock").onclick = () => lock(); $("mode-toggle").onclick = () => setMode(!creating());
   /* Enter anywhere in the form runs the button on screen: Unlock, or Create vault in create mode. */
-  $("unlock-form").addEventListener("submit", event => { event.preventDefault(); unlock(creating()); }); $("new-entry").onclick = newEntry; $("save").onclick = saveVault; $("export").onclick = () => exportVault(); $("import").onclick = importVault; $("change").onclick = changeCredentials; $("save-app").onclick = saveApp; $("delete").onclick = deleteCurrentVault; $("retry-old-delete").onclick = retryOldDeletion; $("cancel-credentials").onclick = () => { clearCredentialFields(); $("credential-dialog").close(); }; $("credential-form").addEventListener("submit", rotateCredentials); $("search").oninput = renderEntries; $("dismiss").onclick = () => $("notice").hidden = true; $("name").focus(); pageHash();
+  $("unlock-form").addEventListener("submit", event => { event.preventDefault(); unlock(creating()); }); $("quick-unlock").onclick = quickUnlock; $("quick-forget").onclick = forgetQuickUnlock; $("quick-enable").onclick = toggleQuickUnlock; $("new-entry").onclick = newEntry; $("save").onclick = saveVault; $("export").onclick = () => exportVault(); $("import").onclick = importVault; $("change").onclick = changeCredentials; $("save-app").onclick = saveApp; $("delete").onclick = deleteCurrentVault; $("retry-old-delete").onclick = retryOldDeletion; $("cancel-credentials").onclick = () => { clearCredentialFields(); $("credential-dialog").close(); }; $("credential-form").addEventListener("submit", rotateCredentials); $("search").oninput = renderEntries; $("dismiss").onclick = () => $("notice").hidden = true; $("name").focus(); refreshQuickUnlock(); pageHash();
   $("toggle-all").onclick = () => { state.showAll = !state.showAll; renderEntries(); };
   $("clear-search").onclick = () => { $("search").value = ""; $("search").focus(); renderEntries(); };
   /* Theme follows the OS until the user overrides it; nothing is persisted. */
