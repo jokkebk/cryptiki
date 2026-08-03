@@ -122,7 +122,7 @@ grant the workflow token read-only contents permission. GitHub Actions deploys
 code only: it does not migrate legacy data or change Namecheap nameservers.
 Protected branches, production environment approval, Cloudflare token
 scope/rotation, and WAF rules remain operator controls; see
-`SecurityRemediationChecklist.md`.
+[`docs/security/audits/2026-07-28/SecurityRemediationChecklist.md`](docs/security/audits/2026-07-28/SecurityRemediationChecklist.md).
 
 Releases should report the git commit SHA plus the SHA-256 of the served
 `public/index.html`. Keep production and preview database IDs separate.
