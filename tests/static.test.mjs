@@ -10,7 +10,8 @@ test("standalone deployed code stays local and within the budget", () => {
   assert.ok(html.includes('location.protocol === "file:"'));
   assert.ok(html.includes("https://cryptiki.com"));
   assert.doesNotMatch(html, /<(?:script|link)[^>]+(?:src|href)=["']https?:/i);
-  assert.doesNotMatch(html, /\b(?:localStorage|sessionStorage)\s*\./);
+  assert.match(html, /localStorage\.getItem\(RETIREMENT_NOTICE_KEY\)/);
+  assert.match(html, /localStorage\.setItem\(RETIREMENT_NOTICE_KEY, "1"\)/);
   assert.match(html, /indexedDB\.open\(QUICK_DB/);
   assert.doesNotMatch(html, /innerHTML/);
   /* The standalone app remains below its original 2,000-line / 100-KiB budget. */

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-3SZimI0sxIUx6CWtJwi82kWlvQybIUB58gDq6p+DAyU='; style-src 'sha256-yh3W38kA0RJ9RRaBUUHfOKP/PuaVqZkNai4emb0uQD4='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nTHtWBYxTVd/z6+K9W0G5qLZcU9yBwVj5VlIwI92eZc='; style-src 'sha256-yh3W38kA0RJ9RRaBUUHfOKP/PuaVqZkNai4emb0uQD4='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
 <style>
 /* Light palette: warm paper. Dark palette below. Theme follows the OS; the header
    toggle overrides it for this session only — nothing is written to browser storage. */
@@ -1241,6 +1241,7 @@ const MAX_ENTRIES = 1000;
 const MAX_STRING = 16 * 1024;
 const MAX_DOCUMENT_BYTES = 512 * 1024;
 const MAX_BLOB = 128 * 1024;
+const RETIREMENT_NOTICE_KEY = "cryptiki.retirement-notice-dismissed";
 const $ = id => document.getElementById(id);
 /* Captured while the document is still exactly as served, before vault data can reach the DOM, so
    "Save this app" cannot carry a rendered secret out with it. */
@@ -1250,6 +1251,13 @@ const bytes = value => value instanceof Uint8Array ? value : new Uint8Array(valu
 const cat = (...parts) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let at = 0; for (const p of parts) { out.set(p, at); at += p.length; } return out; };
 const hex = value => [...value].map(x => x.toString(16).padStart(2, "0")).join("");
 const b64 = value => { let s = ""; for (let i = 0; i < value.length; i += 0x8000) s += String.fromCharCode(...value.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+function retirementNoticeDismissed() {
+  try { return window.localStorage.getItem(RETIREMENT_NOTICE_KEY) === "1"; } catch { return false; }
+}
+function dismissRetirementNotice() {
+  try { window.localStorage.setItem(RETIREMENT_NOTICE_KEY, "1"); } catch { /* Storage may be unavailable. */ }
+  $("notice").hidden = true;
+}
 /* Syntax and size are checked on the encoded string, so an oversized paste never reaches atob(). */
 const unb64 = (value, max = MAX_BLOB) => {
   if (typeof value !== "string" || !/^[A-Za-z0-9_-]+$/.test(value) || value.length % 4 === 1) throw Error("Invalid encoded data");
@@ -1713,7 +1721,7 @@ function pageHash() { const html = document.documentElement.outerHTML.replace(/(
 window.addEventListener("DOMContentLoaded", () => {
   $("version").textContent = VERSION; $("lock").onclick = () => lock(); $("mode-toggle").onclick = () => setMode(!creating());
   /* Enter anywhere in the form runs the button on screen: Unlock, or Create vault in create mode. */
-  $("unlock-form").addEventListener("submit", event => { event.preventDefault(); unlock(creating()); }); $("quick-unlock").onclick = quickUnlock; $("quick-forget").onclick = forgetQuickUnlock; $("quick-enable").onclick = toggleQuickUnlock; $("new-entry").onclick = newEntry; $("save").onclick = saveVault; $("export").onclick = () => exportVault(); $("import").onclick = importVault; $("change").onclick = changeCredentials; $("save-app").onclick = saveApp; $("delete").onclick = deleteCurrentVault; $("retry-old-delete").onclick = retryOldDeletion; $("cancel-credentials").onclick = () => { clearCredentialFields(); $("credential-dialog").close(); }; $("credential-form").addEventListener("submit", rotateCredentials); $("search").oninput = renderEntries; $("dismiss").onclick = () => $("notice").hidden = true; $("name").focus(); refreshQuickUnlock(); pageHash();
+  $("unlock-form").addEventListener("submit", event => { event.preventDefault(); unlock(creating()); }); $("quick-unlock").onclick = quickUnlock; $("quick-forget").onclick = forgetQuickUnlock; $("quick-enable").onclick = toggleQuickUnlock; $("new-entry").onclick = newEntry; $("save").onclick = saveVault; $("export").onclick = () => exportVault(); $("import").onclick = importVault; $("change").onclick = changeCredentials; $("save-app").onclick = saveApp; $("delete").onclick = deleteCurrentVault; $("retry-old-delete").onclick = retryOldDeletion; $("cancel-credentials").onclick = () => { clearCredentialFields(); $("credential-dialog").close(); }; $("credential-form").addEventListener("submit", rotateCredentials); $("search").oninput = renderEntries; $("dismiss").onclick = dismissRetirementNotice; $("notice").hidden = retirementNoticeDismissed(); $("name").focus(); refreshQuickUnlock(); pageHash();
   $("toggle-all").onclick = () => { state.showAll = !state.showAll; renderEntries(); };
   $("clear-search").onclick = () => { $("search").value = ""; $("search").focus(); renderEntries(); };
   /* Theme follows the OS until the user overrides it; nothing is persisted. */

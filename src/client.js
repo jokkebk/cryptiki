@@ -7,6 +7,7 @@ const MAX_ENTRIES = 1000;
 const MAX_STRING = 16 * 1024;
 const MAX_DOCUMENT_BYTES = 512 * 1024;
 const MAX_BLOB = 128 * 1024;
+const RETIREMENT_NOTICE_KEY = "cryptiki.retirement-notice-dismissed";
 const $ = id => document.getElementById(id);
 /* Captured while the document is still exactly as served, before vault data can reach the DOM, so
    "Save this app" cannot carry a rendered secret out with it. */
@@ -16,6 +17,13 @@ const bytes = value => value instanceof Uint8Array ? value : new Uint8Array(valu
 const cat = (...parts) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let at = 0; for (const p of parts) { out.set(p, at); at += p.length; } return out; };
 const hex = value => [...value].map(x => x.toString(16).padStart(2, "0")).join("");
 const b64 = value => { let s = ""; for (let i = 0; i < value.length; i += 0x8000) s += String.fromCharCode(...value.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+function retirementNoticeDismissed() {
+  try { return window.localStorage.getItem(RETIREMENT_NOTICE_KEY) === "1"; } catch { return false; }
+}
+function dismissRetirementNotice() {
+  try { window.localStorage.setItem(RETIREMENT_NOTICE_KEY, "1"); } catch { /* Storage may be unavailable. */ }
+  $("notice").hidden = true;
+}
 /* Syntax and size are checked on the encoded string, so an oversized paste never reaches atob(). */
 const unb64 = (value, max = MAX_BLOB) => {
   if (typeof value !== "string" || !/^[A-Za-z0-9_-]+$/.test(value) || value.length % 4 === 1) throw Error("Invalid encoded data");
@@ -479,7 +487,7 @@ function pageHash() { const html = document.documentElement.outerHTML.replace(/(
 window.addEventListener("DOMContentLoaded", () => {
   $("version").textContent = VERSION; $("lock").onclick = () => lock(); $("mode-toggle").onclick = () => setMode(!creating());
   /* Enter anywhere in the form runs the button on screen: Unlock, or Create vault in create mode. */
-  $("unlock-form").addEventListener("submit", event => { event.preventDefault(); unlock(creating()); }); $("quick-unlock").onclick = quickUnlock; $("quick-forget").onclick = forgetQuickUnlock; $("quick-enable").onclick = toggleQuickUnlock; $("new-entry").onclick = newEntry; $("save").onclick = saveVault; $("export").onclick = () => exportVault(); $("import").onclick = importVault; $("change").onclick = changeCredentials; $("save-app").onclick = saveApp; $("delete").onclick = deleteCurrentVault; $("retry-old-delete").onclick = retryOldDeletion; $("cancel-credentials").onclick = () => { clearCredentialFields(); $("credential-dialog").close(); }; $("credential-form").addEventListener("submit", rotateCredentials); $("search").oninput = renderEntries; $("dismiss").onclick = () => $("notice").hidden = true; $("name").focus(); refreshQuickUnlock(); pageHash();
+  $("unlock-form").addEventListener("submit", event => { event.preventDefault(); unlock(creating()); }); $("quick-unlock").onclick = quickUnlock; $("quick-forget").onclick = forgetQuickUnlock; $("quick-enable").onclick = toggleQuickUnlock; $("new-entry").onclick = newEntry; $("save").onclick = saveVault; $("export").onclick = () => exportVault(); $("import").onclick = importVault; $("change").onclick = changeCredentials; $("save-app").onclick = saveApp; $("delete").onclick = deleteCurrentVault; $("retry-old-delete").onclick = retryOldDeletion; $("cancel-credentials").onclick = () => { clearCredentialFields(); $("credential-dialog").close(); }; $("credential-form").addEventListener("submit", rotateCredentials); $("search").oninput = renderEntries; $("dismiss").onclick = dismissRetirementNotice; $("notice").hidden = retirementNoticeDismissed(); $("name").focus(); refreshQuickUnlock(); pageHash();
   $("toggle-all").onclick = () => { state.showAll = !state.showAll; renderEntries(); };
   $("clear-search").onclick = () => { $("search").value = ""; $("search").focus(); renderEntries(); };
   /* Theme follows the OS until the user overrides it; nothing is persisted. */
