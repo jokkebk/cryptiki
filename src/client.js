@@ -293,7 +293,7 @@ function toggleNote(entry, row, noteButton) {
 }
 function noteField(entry, noteButton) {
   const wrap = document.createElement("div"); wrap.className = "note-wrap";
-  const area = document.createElement("textarea"); area.value = entry.note;
+  const area = document.createElement("textarea"); area.value = entry.note; area.rows = 5;
   area.placeholder = "Recovery codes, security answers, account numbers…";
   area.setAttribute("aria-label", "Note for " + (entry.service || "entry"));
   area.addEventListener("input", () => {

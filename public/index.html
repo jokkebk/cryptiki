@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nTHtWBYxTVd/z6+K9W0G5qLZcU9yBwVj5VlIwI92eZc='; style-src 'sha256-PVc8nGzyTzxs0D4KfYtkqpzo4TXGKOjYOOONGsitrbU='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ueYVGPhKC+vGTTbAD/Jkl5kRuwFcoiZEijtzict8UWI='; style-src 'sha256-PVc8nGzyTzxs0D4KfYtkqpzo4TXGKOjYOOONGsitrbU='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
 <style>
 /* Light palette: warm paper. Dark palette below. Theme follows the OS; the header
    toggle overrides it for this session only — nothing is written to browser storage. */
@@ -1527,7 +1527,7 @@ function toggleNote(entry, row, noteButton) {
 }
 function noteField(entry, noteButton) {
   const wrap = document.createElement("div"); wrap.className = "note-wrap";
-  const area = document.createElement("textarea"); area.value = entry.note;
+  const area = document.createElement("textarea"); area.value = entry.note; area.rows = 5;
   area.placeholder = "Recovery codes, security answers, account numbers…";
   area.setAttribute("aria-label", "Note for " + (entry.service || "entry"));
   area.addEventListener("input", () => {
