@@ -30,7 +30,9 @@ the master password is never stored. The web API requires device verification,
 not biometrics specifically, so the OS may permit its PIN, password, or pattern
 fallback. Clearing site data, removing the authenticator credential, changing
 vault credentials, or deleting the vault removes or invalidates the shortcut;
-the long credentials remain the recovery path. Quick unlock is origin-bound and
+the long credentials remain the recovery path. The credential is a passkey, so
+it is listed in the device's passkey manager; removing quick unlock asks the
+manager to drop it where the browser supports that. Quick unlock is origin-bound and
 is deliberately unavailable in a saved `file:` copy.
 
 This does not protect against a host that serves malicious JavaScript: it can

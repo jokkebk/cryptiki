@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UImyWfxT14nD5YHIkxhJzAoj/Yij1reXH9hGcEcRIGo='; style-src 'sha256-PVc8nGzyTzxs0D4KfYtkqpzo4TXGKOjYOOONGsitrbU='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-v5Rh7yO+lIPOC8eMBiPHqLDNnUsl+woCosBfWzspmOs='; style-src 'sha256-PVc8nGzyTzxs0D4KfYtkqpzo4TXGKOjYOOONGsitrbU='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
 <style>
 /* Light palette: warm paper. Dark palette below. Theme follows the OS; the header
    toggle overrides it for this session only — nothing is written to browser storage. */
@@ -1377,16 +1377,28 @@ async function requestQuickPrf(credentialId, prfInput) {
   if (!credential || b64(bytes(credential.rawId)) !== b64(credentialId)) throw Error("Device returned the wrong credential");
   return prfOutput(credential) || Promise.reject(Error("This browser or authenticator does not support secure quick unlock"));
 }
+/* Probed at page load: Safari only lets a tap start a WebAuthn prompt if nothing slow is awaited first. */
+let quickPrfUnsupported = false;
+async function probeQuickPrf() {
+  try { if (typeof PublicKeyCredential.getClientCapabilities === "function") quickPrfUnsupported = (await PublicKeyCredential.getClientCapabilities())["extension:prf"] === false; } catch { /* Unknown: let setup try. */ }
+}
+/* Discoverable, because Android only evaluates PRF for passkeys; Apple platforms make every credential one anyway.
+   Returns output null when the authenticator only answers PRF on a later sign-in. */
 async function createQuickCredential(prfInput) {
-  if (typeof PublicKeyCredential.getClientCapabilities === "function") {
-    const capabilities = await PublicKeyCredential.getClientCapabilities();
-    if (capabilities["extension:prf"] === false) throw Error("This browser does not support secure quick unlock");
-  }
+  if (quickPrfUnsupported) throw Error("This browser does not support secure quick unlock");
   const userId = crypto.getRandomValues(new Uint8Array(32));
-  const credential = await navigator.credentials.create({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), rp: { name: "Cryptiki" }, user: { id: userId, name: `quick-${b64(userId)}`, displayName: "Cryptiki quick unlock" }, pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }], authenticatorSelection: { authenticatorAttachment: "platform", residentKey: "discouraged", userVerification: "required" }, timeout: 60000, attestation: "none", extensions: { prf: { eval: { first: prfInput } } } } });
+  const credential = await navigator.credentials.create({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), rp: { name: "Cryptiki" }, user: { id: userId, name: `quick-${b64(userId)}`, displayName: "Cryptiki quick unlock" }, pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }], authenticatorSelection: { authenticatorAttachment: "platform", residentKey: "required", requireResidentKey: true, userVerification: "required" }, timeout: 60000, attestation: "none", extensions: { prf: { eval: { first: prfInput } } } } });
   if (!credential) throw Error("Quick unlock setup was cancelled");
-  const credentialId = bytes(credential.rawId), output = prfOutput(credential) || await requestQuickPrf(credentialId, prfInput);
-  return { credentialId, output };
+  const credentialId = bytes(credential.rawId);
+  if (credential.getClientExtensionResults?.().prf?.enabled === false) {
+    forgetQuickCredential(credentialId);
+    throw Error("This device's passkey provider does not support secure quick unlock — choose Google Password Manager or iCloud Keychain as the provider");
+  }
+  return { credentialId, output: prfOutput(credential) };
+}
+/* Best effort: lets the passkey provider drop a credential nothing will use again. */
+function forgetQuickCredential(credentialId) {
+  try { PublicKeyCredential.signalUnknownCredential?.({ rpId: location.hostname, credentialId: b64(credentialId) }).catch(() => {}); } catch { /* Unsupported. */ }
 }
 /* Kept identical to strongCredentials() in src/migration-core.js; tests assert the two agree. */
 function strongCredentials(name, password) { return name.length >= 4 && password.length >= 12 && name.length + password.length >= 24; }
@@ -1397,7 +1409,7 @@ const CREDENTIAL_RULE = "Use a vault name of 4+ characters and a master password
    were short enough that ordinary use — a glance at another tab, a phone call — meant re-unlocking. */
 const IDLE_LOCK_MS = 60 * 60 * 1000, HIDDEN_LOCK_MS = 15 * 60 * 1000;
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*-_";
-const state = { keys: null, doc: null, rev: 0, dirty: false, lockTimer: 0, showAll: false, fresh: new Set(), openNotes: new Set(), rotation: null };
+const state = { keys: null, doc: null, rev: 0, dirty: false, lockTimer: 0, showAll: false, fresh: new Set(), openNotes: new Set(), rotation: null, quickPending: null };
 let quickSaved = false;
 function status(message, error = false) { $("status").textContent = message; $("status").className = error ? "error" : ""; }
 function busy(value) { document.body.classList.toggle("busy", value); for (const id of ["unlock", "mode-toggle", "quick-unlock", "quick-enable", "quick-forget"]) $(id).disabled = value; }
@@ -1415,7 +1427,7 @@ function lock(reason = "Locked") {
   for (const key of ["root", "encKey", "auth", "nameSalt"]) state.keys?.[key]?.fill?.(0);
   if (state.keys) { state.keys.password = ""; state.keys.name = ""; }
   for (const keySet of [state.rotation?.old, state.rotation?.next]) for (const key of ["root", "encKey", "auth", "nameSalt"]) keySet?.[key]?.fill?.(0);
-  state.keys = null; state.doc = null; state.rev = 0; state.dirty = false; state.rotation = null;
+  state.keys = null; state.doc = null; state.rev = 0; state.dirty = false; state.rotation = null; state.quickPending = null; updateQuickButtons();
   $("retry-old-delete").hidden = true;
   state.showAll = false; state.fresh.clear(); state.openNotes.clear();
   for (const id of ["name", "master-password", "create-confirm", "search"]) $(id).value = "";
@@ -1558,15 +1570,20 @@ async function api(method, path, headers = {}, body) {
 function updateQuickButtons() {
   const capable = quickCapable();
   $("quick-unlock").hidden = !capable || !quickSaved; $("quick-forget").hidden = !capable || !quickSaved; $("quick-enable").hidden = !capable;
-  $("quick-enable").textContent = quickSaved ? "Remove quick unlock from this device" : "Enable quick unlock on this device";
+  $("quick-enable").textContent = quickSaved ? "Remove quick unlock from this device" : state.quickPending ? "Finish enabling quick unlock" : "Enable quick unlock on this device";
 }
 async function refreshQuickUnlock() {
   if (!quickCapable()) return updateQuickButtons();
+  await probeQuickPrf();
   try { quickSaved = !!await quickRecord(); } catch { quickSaved = false; }
   updateQuickButtons();
 }
 async function clearQuickUnlock() {
-  if (quickCapable()) await quickRecord(null);
+  if (quickCapable()) {
+    const record = await quickRecord().catch(() => null);
+    await quickRecord(null);
+    try { if (record) forgetQuickCredential(unb64(record.credentialId, 1023)); } catch { /* Malformed record: nothing to signal. */ }
+  }
   quickSaved = false; updateQuickButtons();
 }
 async function forgetQuickUnlock() {
@@ -1576,14 +1593,27 @@ async function forgetQuickUnlock() {
 async function toggleQuickUnlock() {
   if (quickSaved) return forgetQuickUnlock();
   if (!state.keys || !quickCapable()) return status("Quick unlock requires the HTTPS app and an open vault", true);
-  busy(true); status("Verify with this device to enable quick unlock…"); let output;
+  busy(true); let output;
   try {
-    const prfInput = crypto.getRandomValues(new Uint8Array(32));
-    const created = await createQuickCredential(prfInput); output = created.output;
-    await quickRecord(await wrapQuickKeys(state.keys, created.credentialId, prfInput, output));
-    quickSaved = true; updateQuickButtons(); status("Quick unlock enabled on this device");
-  } catch (error) { status(error.name === "NotAllowedError" ? "Quick unlock setup cancelled" : error.message || "Quick unlock setup failed", error.name !== "NotAllowedError"); }
-  finally { output?.fill?.(0); busy(false); }
+    if (!state.quickPending) {
+      status("Verify with this device to enable quick unlock…");
+      const prfInput = crypto.getRandomValues(new Uint8Array(32)), created = await createQuickCredential(prfInput);
+      state.quickPending = { credentialId: created.credentialId, prfInput }; output = created.output;
+    }
+    const { credentialId, prfInput } = state.quickPending;
+    if (!output) {
+      status("Verify once more to finish quick unlock…");
+      /* Safari grants one WebAuthn prompt per tap, so a refused second prompt waits for the next tap. */
+      try { output = await requestQuickPrf(credentialId, prfInput); }
+      catch (error) { if (error.name !== "NotAllowedError") throw error; updateQuickButtons(); return status("Tap “Finish enabling quick unlock” to verify once more"); }
+    }
+    await quickRecord(await wrapQuickKeys(state.keys, credentialId, prfInput, output));
+    state.quickPending = null; quickSaved = true; updateQuickButtons(); status("Quick unlock enabled on this device");
+  } catch (error) {
+    if (state.quickPending) forgetQuickCredential(state.quickPending.credentialId);
+    state.quickPending = null; updateQuickButtons();
+    status(error.name === "NotAllowedError" ? "Quick unlock setup cancelled" : error.message || "Quick unlock setup failed", error.name !== "NotAllowedError");
+  } finally { output?.fill?.(0); busy(false); }
 }
 async function quickUnlock() {
   busy(true); status("Verify with this device to unlock…"); let prf;
