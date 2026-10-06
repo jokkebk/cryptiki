@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ueYVGPhKC+vGTTbAD/Jkl5kRuwFcoiZEijtzict8UWI='; style-src 'sha256-PVc8nGzyTzxs0D4KfYtkqpzo4TXGKOjYOOONGsitrbU='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UImyWfxT14nD5YHIkxhJzAoj/Yij1reXH9hGcEcRIGo='; style-src 'sha256-PVc8nGzyTzxs0D4KfYtkqpzo4TXGKOjYOOONGsitrbU='; connect-src 'self' https://cryptiki.com; img-src data:; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'"><title>Cryptiki v3</title>
 <style>
 /* Light palette: warm paper. Dark palette below. Theme follows the OS; the header
    toggle overrides it for this session only — nothing is written to browser storage. */
@@ -1444,9 +1444,10 @@ function field(cls, value, placeholder, label, apply) {
   return input;
 }
 function visibleEntries() {
-  const needle = $("search").value.trim().toLowerCase();
+  /* Every word must appear somewhere, in any order: "goo gm" finds "Gmail eli Google". */
+  const words = $("search").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const all = state.doc?.entries || [];
-  const found = needle ? all.filter(e => [e.service, e.username, e.note].some(v => v.toLowerCase().includes(needle)))
+  const found = words.length ? all.filter(e => { const text = [e.service, e.username, e.note].join("\n").toLowerCase(); return words.every(w => text.includes(w)); })
     : state.showAll ? all.slice() : all.filter(e => state.fresh.has(e.id));
   return found.sort((a, b) => a.service.localeCompare(b.service, "fi"));
 }

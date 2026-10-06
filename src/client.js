@@ -210,9 +210,10 @@ function field(cls, value, placeholder, label, apply) {
   return input;
 }
 function visibleEntries() {
-  const needle = $("search").value.trim().toLowerCase();
+  /* Every word must appear somewhere, in any order: "goo gm" finds "Gmail eli Google". */
+  const words = $("search").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const all = state.doc?.entries || [];
-  const found = needle ? all.filter(e => [e.service, e.username, e.note].some(v => v.toLowerCase().includes(needle)))
+  const found = words.length ? all.filter(e => { const text = [e.service, e.username, e.note].join("\n").toLowerCase(); return words.every(w => text.includes(w)); })
     : state.showAll ? all.slice() : all.filter(e => state.fresh.has(e.id));
   return found.sort((a, b) => a.service.localeCompare(b.service, "fi"));
 }
